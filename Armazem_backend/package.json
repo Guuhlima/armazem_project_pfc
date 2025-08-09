@@ -1,0 +1,47 @@
+{
+  "name": "fastify-api",
+  "version": "1.0.0",
+  "description": "API Fastify com TypeScript e Swagger",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node src/server.js",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watchAll"
+  },
+  "keywords": [
+    "fastify",
+    "typescript",
+    "swagger",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@fastify/swagger": "^9.5.1",
+    "@fastify/swagger-ui": "^5.2.3",
+    "@fastify/type-provider-typebox": "^5.2.0",
+    "@sinclair/typebox": "^0.34.38",
+    "bcrypt": "^6.0.0",
+    "fastify": "^5.4.0",
+    "fastify-type-provider-zod": "^5.0.3",
+    "zod": "^4.0.15"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.11.19",
+    "jest": "^30.0.5",
+    "jsonwebtoken": "^9.0.2",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typebox": "^0.0.1",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id        Int     @id @default(autoincrement())
+  nome      String? @db.VarChar(255)
+  email     String? @unique @db.VarChar(255)
+  matricula Int?
+  senha     String? @db.VarChar(255)
+
+  permissoes UsuarioPermissao[]
+
+  @@map("usuarios")
+}
+
+model Equipamento {
+  id             Int             @id @default(autoincrement())
+  nome           String?         @map("equipamento") @db.VarChar(255)
+  quantidade     Int?
+  data           DateTime?       @db.Date
+  transferencias Transferencia[]
+  estoqueItens   EstoqueItem[]
+
+  @@map("equipamentos")
+}
+
+model Estoque {
+  id   Int    @id @default(autoincrement())
+  nome String @db.VarChar(100)
+
+  transferenciasDestino Transferencia[] @relation("TransferenciasDestino")
+  transferenciasOrigem  Transferencia[] @relation("TransferenciasOrigem")
+  itens                 EstoqueItem[]
+
+  @@map("estoques")
+}
+
+model Transferencia {
+  id                Int       @id @default(autoincrement())
+  itemId            Int
+  estoqueOrigemId   Int
+  estoqueDestinoId  Int
+  quantidade        Int
+  dataTransferencia DateTime? @default(now()) @db.Timestamp(6)
+
+  item    Equipamento @relation(fields: [itemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  origem  Estoque     @relation("TransferenciasOrigem", fields: [estoqueOrigemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  destino Estoque     @relation("TransferenciasDestino", fields: [estoqueDestinoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("transferencias")
+}
+
+model EstoqueItem {
+  id         Int @id @default(autoincrement())
+  estoqueId  Int
+  itemId     Int
+  quantidade Int
+
+  estoque Estoque     @relation(fields: [estoqueId], references: [id])
+  item    Equipamento @relation(fields: [itemId], references: [id])
+
+  @@unique([itemId, estoqueId], name: "itemId_estoqueId")
+  @@map("estoque_itens")
+}
+
+model Permissao {
+  id               Int                  @id @default(autoincrement())
+  nome             String               @unique @db.VarChar(50)
+  usuarios         UsuarioPermissao[]
+  rotasPermitidas  PermissaoOnRoute[]
+
+  @@map("permissoes")
+}
+
+model UsuarioPermissao {
+  usuarioId     Int
+  permissaoId   Int
+
+  
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, permissaoId])
+  @@map("usuarios_permissoes")
+}
+
+model Route {
+  id          Int           @id @default(autoincrement())
+  nome        String 
+  path        String 
+  permissoes  PermissaoOnRoute[]
+  createdAt   DateTime      @default(now())
+}
+
+model PermissaoOnRoute {
+  id           Int        @id @default(autoincrement())
+  permissaoId  Int
+  routeId      Int
+
+  permissao    Permissao  @relation(fields: [permissaoId], references: [id])
+  route        Route      @relation(fields: [routeId], references: [id])
+}
