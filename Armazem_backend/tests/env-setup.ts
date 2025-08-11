@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 
 const DB_BASE =
   process.env.DATABASE_URL_BASE ||
-  'postgresql://admin:admin123@127.0.0.1:5433/armazem';
+  'postgresql://admin:admin123@127.0.0.1:5433/public';
 
 const SCHEMA = `test_${randomUUID().replace(/-/g, '')}`;
 

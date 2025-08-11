@@ -28,6 +28,14 @@ CREATE TABLE "public"."estoques" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."usuarios_estoques" (
+    "usuarioId" INTEGER NOT NULL,
+    "estoqueId" INTEGER NOT NULL,
+
+    CONSTRAINT "usuarios_estoques_pkey" PRIMARY KEY ("usuarioId","estoqueId")
+);
+
+-- CreateTable
 CREATE TABLE "public"."transferencias" (
     "id" SERIAL NOT NULL,
     "itemId" INTEGER NOT NULL,
@@ -92,6 +100,12 @@ CREATE UNIQUE INDEX "estoque_itens_itemId_estoqueId_key" ON "public"."estoque_it
 
 -- CreateIndex
 CREATE UNIQUE INDEX "permissoes_nome_key" ON "public"."permissoes"("nome");
+
+-- AddForeignKey
+ALTER TABLE "public"."usuarios_estoques" ADD CONSTRAINT "usuarios_estoques_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "public"."usuarios"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."usuarios_estoques" ADD CONSTRAINT "usuarios_estoques_estoqueId_fkey" FOREIGN KEY ("estoqueId") REFERENCES "public"."estoques"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."transferencias" ADD CONSTRAINT "transferencias_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "public"."equipamentos"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;

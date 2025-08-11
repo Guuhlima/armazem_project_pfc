@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model Usuario {
@@ -15,6 +16,7 @@ model Usuario {
   senha     String? @db.VarChar(255)
 
   permissoes UsuarioPermissao[]
+  estoques   UsuarioEstoque[]
 
   @@map("usuarios")
 }
@@ -38,7 +40,20 @@ model Estoque {
   transferenciasOrigem  Transferencia[] @relation("TransferenciasOrigem")
   itens                 EstoqueItem[]
 
+  usuarios UsuarioEstoque[]
+
   @@map("estoques")
+}
+
+model UsuarioEstoque {
+  usuarioId Int
+  estoqueId Int
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  estoque Estoque @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, estoqueId])
+  @@map("usuarios_estoques")
 }
 
 model Transferencia {

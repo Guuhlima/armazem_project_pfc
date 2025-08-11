@@ -15,38 +15,59 @@ export async function cadastrarUsuarios(req: FastifyRequest<{ Body: Body }>, rep
 
     const hashPassword = await bcrypt.hash(senha, 10);
 
-    const usuario = await prisma.usuario.create({
-      data: {
-        nome,
-        email,
-        matricula,
-        senha: hashPassword,
-      },
+    const usuario = await prisma.$transaction(async (tx) => {
+      const permissaoPadrao = await tx.permissao.upsert({
+        where: { nome: 'usuario' },
+        create: { nome: 'usuario' },
+        update: {},
+      });
+
+      const novoUsuario = await tx.usuario.create({
+        data: {
+          nome,
+          email: email?.trim().toLowerCase(),
+          matricula,
+          senha: hashPassword,
+          permissoes: {
+            create: [
+              {
+                permissao: { connect: { id: permissaoPadrao.id } },
+              },
+            ],
+          },
+        },
+        include: {
+          permissoes: { include: { permissao: true } },
+        },
+      });
+
+      return novoUsuario;
     });
 
-    reply.send(usuario);
+    return reply.code(201).send(usuario);
   } catch (error: any) {
     if (error.code === 'P2002') {
-      reply.status(409).send({ error: 'Email já está em uso' });
-    } else {
-      reply.status(500).send({ error: 'Erro ao cadastrar usuário' });
-      console.error(error);
+      return reply.status(409).send({ error: 'Email já está em uso' });
     }
+    console.error(error);
+    return reply.status(500).send({ error: 'Erro ao cadastrar usuário' });
   }
 }
 
 export async function login(req: FastifyRequest<{ Body: Static<typeof UsuarioLoginSchema> }>, reply: FastifyReply) {
   try {
     const { email, senha } = req.body;
+    const candidate = email?.trim();
 
-    const user = await prisma.usuario.findUnique({
-      where: { email },
-      include: {
-        permissoes: {
-          include: {
-            permissao: true,
-          },
+    const user = await prisma.usuario.findFirst({
+      where: {
+        email: {
+          equals: candidate,
+          mode: 'insensitive',
         },
+      },
+      include: {
+        permissoes: { include: { permissao: true } },
       },
     });
 
@@ -55,41 +76,27 @@ export async function login(req: FastifyRequest<{ Body: Static<typeof UsuarioLog
     }
 
     const isValid = await bcrypt.compare(senha, user.senha);
-
     if (!isValid) {
       return reply.status(401).send({ error: 'Senha incorreta' });
     }
 
     const permissoes = user.permissoes.map(p => p.permissao.nome);
-
-    const payload = {
-      id: user.id,
-      nome: user.nome,
-      email: user.email,
-      permissoes,
-    };
+    const payload = { id: user.id, nome: user.nome, email: user.email, permissoes };
 
     const jwtSecret = process.env.JWT_SECRET;
     const jwtExpiresIn = (process.env.JWT_EXPIRES_IN || '24h') as StringValue;
+    if (!jwtSecret) throw new Error('JWT_SECRET não está definida nas variáveis de ambiente');
 
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET não está definida nas variáveis de ambiente');
-    }
+    const token = jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn });
 
-    const signOptions: SignOptions = {
-      expiresIn: jwtExpiresIn,
-    };
-
-    const token = jwt.sign(payload, jwtSecret, signOptions);
-
-    reply.send({
+    return reply.send({
       message: 'Login realizado com sucesso',
       token,
       user: payload,
     });
   } catch (error) {
     console.error(error);
-    reply.status(500).send({ error: 'Erro ao realizar login' });
+    return reply.status(500).send({ error: 'Erro ao realizar login' });
   }
 }
 

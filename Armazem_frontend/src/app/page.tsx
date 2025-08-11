@@ -9,18 +9,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Mail, Lock } from 'lucide-react';
 import api from '@/services/api';
 
-const Login = () => {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    setLoading(true);
     try {
-      const res = await api.post('/user/login', { email, senha});
-
-      const { token, user } = res.data
+      const res = await api.post('/user/login', { email, senha });
+      const { token, user } = res.data;
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -29,6 +29,8 @@ const Login = () => {
     } catch (error) {
       console.error('Erro ao realizar login:', error);
       alert('Erro ao realizar login');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -74,10 +76,21 @@ const Login = () => {
                 />
               </div>
 
-              <Button type="submit" className="w-full" variant="default" size="lg">
-                Entrar
+              <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                {loading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
+
+            {/* CTA para registro */}
+            <div className="text-center text-sm text-zinc-400">
+              Não tem conta?{' '}
+              <button
+                onClick={() => router.push('/auth/register')}
+                className="text-white underline underline-offset-4 hover:opacity-80"
+              >
+                Criar conta
+              </button>
+            </div>
 
             <p className="text-xs text-zinc-400 text-center">
               © {new Date().getFullYear()} Gustavo Inc. Todos os direitos reservados.
@@ -87,6 +100,4 @@ const Login = () => {
       </motion.div>
     </main>
   );
-};
-
-export default Login;
+}

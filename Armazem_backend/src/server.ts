@@ -1,13 +1,12 @@
-import Fastify from 'fastify';
-import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import { equipamentosRoutes } from './routes/equipment.routes';
-import { usuariosRoutes } from './routes/user.routes.js';
-// import { historicoRoutes } from './routes/historicoRoutes';
-import { transferenciasRoutes } from './routes/transfer.routes';
-import { estoquesRoutes } from 'routes/stock.routes';
-import { estoqueItensRoutes } from 'routes/stockItens.routes';
-import cors from '@fastify/cors';
-import dotenv from 'dotenv';
+import Fastify from 'fastify'
+import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
+import { equipamentosRoutes } from './routes/equipment.routes'
+import { usuariosRoutes } from './routes/user.routes'            // <- remover .js
+import { transferenciasRoutes } from './routes/transfer.routes'
+import { estoquesRoutes } from './routes/stock.routes'            // <- adicionar ./
+import { estoqueItensRoutes } from './routes/stockItens.routes'   // <- adicionar ./
+import cors from '@fastify/cors'
+import dotenv from 'dotenv'
 
 dotenv.config();
 
