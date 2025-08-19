@@ -1,7 +1,10 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { UsuarioBodySchema, UsuarioParamsSchema, UsuarioLoginSchema } from '../schemas/user.schema';
+import { generateToken, hashPassword } from '../utils/password-reset';
+import { sendPasswordResetEmail } from '../utils/mailer';
 import { Static } from '@sinclair/typebox';
 import { prisma } from '../lib/prisma';
+import * as crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import type { StringValue } from 'ms';
@@ -51,6 +54,87 @@ export async function cadastrarUsuarios(req: FastifyRequest<{ Body: Body }>, rep
     }
     console.error(error);
     return reply.status(500).send({ error: 'Erro ao cadastrar usuário' });
+  }
+}
+
+export async function requestPasswordReset(req: FastifyRequest<{ Body: { email: string } }>, reply: FastifyReply) {
+  try {
+    const { email } = req.body;
+
+    const user = await prisma.usuario.findUnique({ where: { email } });
+    if (!user) {
+      return reply.status(404).send({ error: 'E-mail não encontrado.' });
+    }
+
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id, usedAt: null },
+    });
+
+    const { token, tokenHash } = generateToken();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    const resetUrl = `${process.env.WEB_APP_URL}/reset-password?email=${encodeURIComponent(
+      email
+    )}&token=${token}`;
+    await sendPasswordResetEmail(email, resetUrl);
+
+    return reply.status(200).send({ message: 'E-mail de recuperação enviado.' });
+  } catch (error) {
+    console.error('Erro ao solicitar recuperação de senha', error);
+    return reply.status(500).send({ error: 'Erro ao solicitar recuperação de senha' });
+  }
+}
+
+export async function recoverPassword(
+  req: FastifyRequest<{ Body: { email: string; token: string; senha: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { email, token, senha } = req.body;
+
+    const user = await prisma.usuario.findUnique({ where: { email } });
+    if (!user) {
+      return reply.status(404).send({ error: 'E-mail não encontrado.' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const record = await prisma.passwordResetToken.findFirst({
+      where: { userId: user.id, tokenHash, usedAt: null },
+    });
+
+    if (!record) {
+      return reply.status(400).send({ error: 'Token inválido.' });
+    }
+
+    if (record.expiresAt.getTime() < Date.now()) {
+      return reply.status(400).send({ error: 'Token expirado.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(senha, 10);
+
+    await prisma.$transaction([
+      prisma.usuario.update({
+        where: { id: user.id },
+        data: { senha: hashedPassword },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return reply.status(200).send({ message: 'Senha atualizada com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao recuperar senha', error);
+    return reply.status(500).send({ error: 'Erro ao recuperar senha' });
   }
 }
 

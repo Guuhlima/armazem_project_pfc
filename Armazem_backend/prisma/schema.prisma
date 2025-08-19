@@ -15,10 +15,25 @@ model Usuario {
   matricula Int?
   senha     String? @db.VarChar(255)
 
+  resetTokens PasswordResetToken[]
   permissoes UsuarioPermissao[]
   estoques   UsuarioEstoque[]
 
   @@map("usuarios")
+}
+
+model PasswordResetToken {
+  id        String     @id @default(cuid())
+  userId    Int     
+  tokenHash String
+  expiresAt DateTime
+  usedAt   DateTime?
+  createdAt DateTime    @default(now())
+
+  user      Usuario     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Equipamento {
