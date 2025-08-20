@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { User, Mail, IdCard, Lock } from 'lucide-react';
 import api from '@/services/api';
+import Swal from 'sweetalert2';
 
 export default function Register() {
   const router = useRouter();
@@ -33,7 +34,13 @@ export default function Register() {
     try {
       const res = await api.post('/user/cadastro', { nome, email, matricula, senha });
 
-      alert('Conta criada com sucesso! Faça login para continuar.');
+      Swal.fire({
+        title: "Sucess",
+        text: "Conta criada, redirecionando para o login",
+        icon: "success",
+        timer: 2000,
+      })
+
       router.push('/home');
     } catch (err: any) {
       if (err?.response?.status === 409) {
@@ -105,7 +112,7 @@ export default function Register() {
                 {loading ? 'Criando...' : 'Criar conta'}
               </Button>
 
-              <Button type="button" variant="ghost" className="w-full" onClick={() => router.push('/login')}>
+              <Button type="button" variant="ghost" className="w-full" onClick={() => router.push('/')}>
                 Já tenho conta
               </Button>
             </form>

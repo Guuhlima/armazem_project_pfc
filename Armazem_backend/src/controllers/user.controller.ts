@@ -18,7 +18,7 @@ export async function cadastrarUsuarios(req: FastifyRequest<{ Body: Body }>, rep
     const usuario = await prisma.$transaction(async (tx) => {
       const permissaoPadrao = await tx.permissao.upsert({
         where: { nome: 'usuario' },
-        create: { nome: 'usuario' },
+        create: { nome: 'usuarioPadrão' },
         update: {},
       });
 
@@ -51,6 +51,32 @@ export async function cadastrarUsuarios(req: FastifyRequest<{ Body: Body }>, rep
     }
     console.error(error);
     return reply.status(500).send({ error: 'Erro ao cadastrar usuário' });
+  }
+}
+
+export async function resetarSenha(req: FastifyRequest<{ Body: Body, Params: Params}>, reply: FastifyReply) {
+  try {
+    const { email } = req.body;
+    const candidate = email?.trim();
+
+    const user = await prisma.usuario.findFirst({
+      where: {
+        email: {
+          equals: candidate,
+          mode: 'insensitive'
+        }
+      }
+    });
+
+    if(!user?.email) {
+      return reply.status(400).send({ error: 'Email inválido'});
+    }
+
+    
+    
+  } catch (error) {
+    console.error(error);
+    return reply.status(500).send({ error: 'Erro ao resetar senha'});
   }
 }
 

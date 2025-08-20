@@ -81,14 +81,23 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* CTA para registro */}
             <div className="text-center text-sm text-zinc-400">
               Não tem conta?{' '}
               <button
                 onClick={() => router.push('/auth/register')}
-                className="text-white underline underline-offset-4 hover:opacity-80"
+                className="text-black underline underline-offset-4 hover:opacity-80"
               >
                 Criar conta
+              </button>
+            </div>
+
+            <div className='text-center text-sm text-zinc-400'>
+              Esqueceu a senha?{' '}
+              <button 
+                onClick={() => router.push('/auth/reset_password')}
+                className='text-black underline underline-offset-4 hover:opacity-80'
+              >
+                Resetar Senha
               </button>
             </div>
 
