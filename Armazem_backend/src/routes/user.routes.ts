@@ -1,57 +1,34 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import {
   cadastrarUsuarios,
   visualizarUsuarios,
   visualizarUsuariosPorId,
-  deletarUsuarios,
   editarUsuarios,
-  login,
+  deletarUsuarios,
 } from '../controllers/user.controller';
-
 import {
   UsuarioBodySchema,
   UsuarioParamsSchema,
-  UsuarioLoginSchema,
 } from '../schemas/user.schema';
 
-import { verifyToken } from '../middlewares/verifyToken';
-import { requirePermissionExcluding } from '../middlewares/requirePermissionExcluding';
-
 export async function usuariosRoutes(app: FastifyInstance) {
-  app.post('/user/login', {
-    schema: { body: UsuarioLoginSchema },
-    handler: login,
+  // público: POST /user/cadastro
+  app.post('/cadastro', { schema: { body: UsuarioBodySchema } }, cadastrarUsuarios);
+
+  // protegido: GET /user/visualizar, /user/visualizar/:id, PUT /user/editar/:id
+  app.register(async (r) => {
+    r.addHook('onRequest', r.authenticate);
+    r.addHook('preHandler', r.rbac.requirePerm('user:manage'));
+    r.get('/visualizar', { handler: visualizarUsuarios });
+    r.get('/visualizar/:id', { schema: { params: UsuarioParamsSchema }, handler: visualizarUsuariosPorId });
+    r.put('/editar/:id', { schema: { params: UsuarioParamsSchema, body: UsuarioBodySchema }, handler: editarUsuarios });
   });
 
-  app.post('/user/cadastro', {
-    schema: { body: UsuarioBodySchema },
-    handler: cadastrarUsuarios,
-  });
-
-  app.register(async (userRoutes) => {
-    userRoutes.addHook('preHandler', verifyToken);
-    userRoutes.addHook('preHandler', requirePermissionExcluding(['ADMIN']));
-
-    userRoutes.get('/user/visualizar', visualizarUsuarios);
-
-    userRoutes.get('/user/visualizar/:id', {
-      schema: { params: UsuarioParamsSchema },
-      handler: visualizarUsuariosPorId,
-    });
-
-    userRoutes.put('/user/editar/:id', {
-      schema: { body: UsuarioBodySchema, params: UsuarioParamsSchema },
-      handler: editarUsuarios,
-    });
-  });
-
-  app.register(async (deleteUserRoutes) => {
-    deleteUserRoutes.addHook('preHandler', verifyToken);
-    deleteUserRoutes.addHook('preHandler', requirePermissionExcluding(['SUPER-ADMIN']));
-
-    deleteUserRoutes.delete('/user/deletar/:id', {
-      schema: { params: UsuarioParamsSchema },
-      handler: deletarUsuarios,
-    });
+  // protegido: DELETE /user/deletar/:id
+  app.register(async (r) => {
+    r.addHook('onRequest', r.authenticate);
+    r.addHook('preHandler', r.rbac.requirePerm('user:delete'));
+    r.delete('/deletar/:id', { schema: { params: UsuarioParamsSchema }, handler: deletarUsuarios });
   });
 }
+

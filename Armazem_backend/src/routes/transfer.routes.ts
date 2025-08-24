@@ -5,33 +5,33 @@ import {
   visualizarTransferenciaPorId,
   deletarTransferencia,
 } from '../controllers/transfer.controller';
-
 import { TransferenciaBodySchema, TransferenciaParamsSchema } from '../schemas/transfer.schema';
 import { verifyToken } from '../middlewares/verifyToken';
-import { requirePermissionExcluding } from '../middlewares/requirePermissionExcluding';
 
 export async function transferenciasRoutes(app: FastifyInstance) {
-  app.register(async (transferRoutes) => {
-    transferRoutes.addHook('preHandler', verifyToken);
-    transferRoutes.addHook(
-      'preHandler',
-      requirePermissionExcluding(['USER-EQUIP-TRANSFER', 'ADMIN'])
-    );
+  app.register(async (r) => {
+    r.addHook('preHandler', verifyToken);
 
-    transferRoutes.post('/transfer/cadastro', {
+    r.post('/transfer/cadastro', {
       schema: { body: TransferenciaBodySchema },
+      preHandler: [r.rbac.requirePerm('transfer:manage')],
       handler: realizarTransferencia,
     });
 
-    transferRoutes.get('/transfer/visualizar', visualizarTransferencias);
+    r.get('/transfer/visualizar', {
+      preHandler: [r.rbac.requirePerm('transfer:manage')],
+      handler: visualizarTransferencias,
+    });
 
-    transferRoutes.get('/transfer/visualizar/:id', {
+    r.get('/transfer/visualizar/:id', {
       schema: { params: TransferenciaParamsSchema },
+      preHandler: [r.rbac.requirePerm('transfer:manage')],
       handler: visualizarTransferenciaPorId,
     });
 
-    transferRoutes.delete('/transfer/deletar/:id', {
+    r.delete('/transfer/deletar/:id', {
       schema: { params: TransferenciaParamsSchema },
+      preHandler: [r.rbac.requirePerm('transfer:manage')],
       handler: deletarTransferencia,
     });
   });

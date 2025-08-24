@@ -7,28 +7,40 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Mail, Lock } from 'lucide-react';
-import api from '@/services/api';
+import { apiAuth } from '@/services/api'; 
+import { useIsClient } from '@/hooks/useIsClient';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const isClient = useIsClient();
+  if(!isClient) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await api.post('/user/login', { email, senha });
-      const { token, user } = res.data;
+      const res = await apiAuth.post('/user/login', { email, senha });
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      const { accessToken, refreshToken, token, user } = res.data || {};
+      const at = accessToken ?? token; // compat
+      if (!at) throw new Error('Token não retornado pelo backend');
+
+      localStorage.setItem('accessToken', at);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      if (user) localStorage.setItem('user', JSON.stringify(user));
 
       router.push('/home');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao realizar login:', error);
-      alert('Erro ao realizar login');
+      const msg =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Erro ao realizar login';
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -91,11 +103,11 @@ export default function Login() {
               </button>
             </div>
 
-            <div className='text-center text-sm text-zinc-400'>
+            <div className="text-center text-sm text-zinc-400">
               Esqueceu a senha?{' '}
-              <button 
+              <button
                 onClick={() => router.push('/auth/reset_password')}
-                className='text-black underline underline-offset-4 hover:opacity-80'
+                className="text-black underline underline-offset-4 hover:opacity-80"
               >
                 Resetar Senha
               </button>

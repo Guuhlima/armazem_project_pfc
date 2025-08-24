@@ -1,22 +1,23 @@
+// src/components/withAuth.tsx
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
-const withAuth = (WrappedComponent: React.ComponentType) => {
-  return function ProtectedRoute(props: any) {
+const withAuth = (Wrapped: React.ComponentType) => {
+  return function Protected(props: any) {
     const router = useRouter();
-    const { isAuthenticated } = useAuth();
+    const { ready, isAuthenticated } = useAuth();
 
     useEffect(() => {
-      if (!isAuthenticated) {
-        router.push('/');
-      }
-    }, [isAuthenticated]);
+      if (!ready) return;
+      if (!isAuthenticated) router.replace('/');
+    }, [ready, isAuthenticated, router]);
 
+    if (!ready) return null;
     if (!isAuthenticated) return null;
 
-    return <WrappedComponent {...props} />;
+    return <Wrapped {...props} />;
   };
 };
 

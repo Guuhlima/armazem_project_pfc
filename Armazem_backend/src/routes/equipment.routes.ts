@@ -1,37 +1,49 @@
 import { FastifyInstance } from "fastify";
 import {
-    cadastrarEquipamento,
-    editarEquipamento,
-    visualizarEquipamentos,
-    visualizarEquipamentosPorId,
-    deletarEquipamento
+  cadastrarEquipamento,
+  editarEquipamento,
+  visualizarEquipamentos,
+  visualizarEquipamentosPorId,
+  deletarEquipamento
 } from "../controllers/equipment.controller";
 import { EquipamentoBodySchema, EquipamentoParamsSchema } from "../schemas/equipment.schema";
-import { verifyToken } from '../middlewares/verifyToken';
 
 export async function equipamentosRoutes(app: FastifyInstance) {
-  app.register(async (equipamentoRoutes) => {
-    equipamentoRoutes.addHook('preHandler', verifyToken);
+  app.register(async (r) => {
+    // exige JWT em todas as rotas deste grupo
+    r.addHook('onRequest', r.authenticate);
 
-    equipamentoRoutes.post('/equipment/cadastro', {
-      schema: { body: EquipamentoBodySchema },
-      handler: cadastrarEquipamento,
+    // LISTAR (read)
+    r.get('/equipment/visualizar', {
+      preHandler: [r.rbac.requirePerm('equipment:read')],
+      handler: visualizarEquipamentos,
     });
 
-    equipamentoRoutes.get('/equipment/visualizar', visualizarEquipamentos);
-
-    equipamentoRoutes.get('/equipment/visualizar/:id', {
+    // DETALHE (read)
+    r.get('/equipment/visualizar/:id', {
       schema: { params: EquipamentoParamsSchema },
+      preHandler: [r.rbac.requirePerm('equipment:read')],
       handler: visualizarEquipamentosPorId,
     });
 
-    equipamentoRoutes.put('/equipment/editar/:id', {
+    // CRIAR (manage)
+    r.post('/equipment/cadastro', {
+      schema: { body: EquipamentoBodySchema },
+      preHandler: [r.rbac.requirePerm('equipment:manage')],
+      handler: cadastrarEquipamento,
+    });
+
+    // EDITAR (manage)
+    r.put('/equipment/editar/:id', {
       schema: { params: EquipamentoParamsSchema, body: EquipamentoBodySchema },
+      preHandler: [r.rbac.requirePerm('equipment:manage')],
       handler: editarEquipamento,
     });
 
-    equipamentoRoutes.delete('/equipment/deletar/:id', {
+    // DELETAR (manage)
+    r.delete('/equipment/deletar/:id', {
       schema: { params: EquipamentoParamsSchema },
+      preHandler: [r.rbac.requirePerm('equipment:manage')],
       handler: deletarEquipamento,
     });
   });

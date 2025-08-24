@@ -2,44 +2,73 @@
 
 import React, { useEffect, useState } from 'react';
 import withAuth from '../components/withAuth';
-import api from '@/services/api';
+import { api } from '@/services/api';
 import Sidebar from '../components/Sidebar';
 import TableEquipamentos from '../components/TableEquipamentos';
 import { Card, CardContent } from '@/components/ui/card';
-import { PackageCheck, Plus, FileText } from 'lucide-react';
+import { PackageCheck, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useMyWarehouses } from '@/hooks/useMyWarehouses';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Equipamento } from '@/types/equipamento';
+import { RequestWarehouseModal } from '../components/RequestWarehouseModal';
+
+type BackendEquip = {
+  id: number;
+  nome?: string | null;
+  equipamento?: string | null;
+  quantidade?: number | null;
+  data?: string | Date | null;
+};
 
 const Home = () => {
-  const [equipamentos, setEquipamentos] = useState([]);
+  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
   const [collapsed, setCollapsed] = useState(false);
+  const [openReq, setOpenReq] = useState(false);
+
   const router = useRouter();
+  const { logout } = useAuth();
+  const { loading, isLinked, names, refresh } = useMyWarehouses();
 
   useEffect(() => {
-    const fetchItem = async () => {
-      const response = await api.get('/equipment/visualizar');
-      setEquipamentos(response.data);
-    };
-    fetchItem();
+    (async () => {
+      try {
+        const { data } = await api.get<BackendEquip[]>('/equipment/visualizar');
+
+        const normalized: Equipamento[] = (data ?? []).map((e) => ({
+          id: e.id,
+          nome: (e.nome ?? e.equipamento ?? '—').toString(),
+          quantidade: e.quantidade ?? 0,
+          data:
+            typeof e.data === 'string'
+              ? e.data
+              : e.data instanceof Date
+              ? e.data.toISOString()
+              : '',
+        }));
+
+        setEquipamentos(normalized);
+      } catch (err) {
+        console.error(err);
+        setEquipamentos([]);
+      }
+    })();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth');
-    window.location.href = '/';
+  const handleCardClick = () => {
+    if (isLinked) router.push('/estoque/acess');
+    else setOpenReq(true);
   };
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white transition-colors">
       <Sidebar
-        onLogout={handleLogout}
+        onLogout={logout}
         collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
+        onToggle={() => setCollapsed((v) => !v)}
       />
 
-      <main
-        className={`transition-all duration-300 p-6 pt-4 space-y-6 ${
-          collapsed ? 'ml-16' : 'ml-60'
-        }`}
-      >
+      <main className={`transition-all duration-300 p-6 pt-4 space-y-6 ${collapsed ? 'ml-16' : 'ml-60'}`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow">
             <CardContent className="p-6 flex items-center justify-between">
@@ -65,15 +94,34 @@ const Home = () => {
           </Card>
 
           <Card
-            onClick={() => router.push('/equipamento/get')}
+            onClick={handleCardClick}
             className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow hover:cursor-pointer hover:shadow-lg transition"
           >
             <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm text-zinc-500">Relatórios</h3>
-                <p className="text-2xl font-bold mt-1 text-purple-500">Ver</p>
+              <div className="space-y-1">
+                <h3 className="text-sm text-zinc-500">Armazém</h3>
+
+                {loading ? (
+                  <div className="h-5 w-48 bg-zinc-200 dark:bg-zinc-700 animate-pulse rounded" />
+                ) : isLinked ? (
+                  <p className="text-lg font-semibold truncate max-w-[16rem]" title={names}>
+                    {names}
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-lg font-semibold">Não vinculado a um armazem</p>
+                    <button
+                      className="text-sm text-blue-600 hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenReq(true);
+                      }}
+                    >
+                      Solicitar acesso a armazem
+                    </button>
+                  </>
+                )}
               </div>
-              <FileText className="w-6 h-6 text-purple-500" />
             </CardContent>
           </Card>
         </div>
@@ -83,6 +131,18 @@ const Home = () => {
           <TableEquipamentos data={equipamentos} />
         </section>
       </main>
+
+      {/* Modal de solicitação de acesso ao armazém */}
+      <RequestWarehouseModal
+        open={openReq}
+        onClose={() => setOpenReq(false)}
+        onRequested={() => {
+          // atualiza o hook para refletir mudanças (ex.: exibir nome do armazém após aprovação)
+          refresh();
+        }}
+        // opcional: ocultar armazéns já vinculados
+        // excludeIds={linkedWarehouseIds}
+      />
     </div>
   );
 };

@@ -3,25 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Warehouse,
-  Plus,
-  Trash2,
-  Search,
-  Pencil,
-  Repeat,
-  LogOut,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronDown,
-  ChevronRight,
-  Package,
-  Users,
-  UserPlus,
-  Shield,
+  Warehouse, Plus, Trash2, Search, Pencil, Repeat, LogOut,
+  ChevronsLeft, ChevronsRight, ChevronDown, ChevronRight,
+  Package, Users, UserPlus, Shield,
 } from 'lucide-react';
 import { useState } from 'react';
 import DarkModeToggle from './DarkModeToggle';
 import { useAuth } from '@/contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 interface SidebarProps {
   onLogout: (e: React.MouseEvent) => void;
@@ -37,26 +26,26 @@ const Sidebar = ({ onLogout, collapsed, onToggle }: SidebarProps) => {
 
   return (
     <aside
-      className={`h-screen ${
-        collapsed ? 'w-16' : 'w-60'
-      } transition-all duration-300 fixed left-0 top-0 z-50
-        border-r border-zinc-200 dark:border-zinc-800
-        bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white`}
+      className={`h-screen ${collapsed ? 'w-16' : 'w-60'} transition-all duration-300 fixed left-0 top-0 z-50
+        border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white`}
     >
-      <div className="flex items-center justify-between px-4 py-5 text-xl font-bold border-b border-zinc-200 dark:border-zinc-800">
-        <Link href="/home" className="flex items-center gap-2 hover:opacity-80 transition">
-          <Warehouse className="w-6 h-6 text-blue-500" />
-          {!collapsed && <span>Estoque</span>}
-        </Link>
-        <button
-          onClick={onToggle}
-          className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white"
-        >
-          {collapsed ? <ChevronsRight className="w-5 h-5" /> : <ChevronsLeft className="w-5 h-5" />}
-        </button>
-      </div>
+        <div className="flex items-center justify-between px-4 py-5 text-xl font-bold border-b border-zinc-200 dark:border-zinc-800">
+          <Link href="/home" className="flex items-center gap-2 hover:opacity-80 transition">
+            <Warehouse className="w-6 h-6 text-blue-500" />
+            {!collapsed && <span>Estoque</span>}
+          </Link>
+
+          <div className="flex items-center gap-2">
+            {!collapsed && <NotificationBell />}  {/* 👈 só mostra aberto */}
+            <button onClick={onToggle} className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white">
+              {collapsed ? <ChevronsRight className="w-5 h-5" /> : <ChevronsLeft className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
 
       <nav className="flex-1 px-2 py-4 space-y-1">
+
+
 
         <button
           onClick={() => setOpenEquipamento(!openEquipamento)}
@@ -68,39 +57,42 @@ const Sidebar = ({ onLogout, collapsed, onToggle }: SidebarProps) => {
         >
           <Package className="w-4 h-4" />
           {!collapsed && <span className="flex-1 text-left">Equipamentos</span>}
-          {!collapsed &&
-            (openEquipamento ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
+          {!collapsed && (openEquipamento ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
         </button>
 
         {!collapsed && openEquipamento && (
           <div className="ml-6 space-y-1">
-            <Link href="/equipamento/create" className={navItem(pathname, '/equipamento/create')}>
-              <Plus className="w-4 h-4" />
-              Criar
-            </Link>
-            <Link href="/equipamento/delete" className={navItem(pathname, '/equipamento/delete')}>
-              <Trash2 className="w-4 h-4" />
-              Deletar
-            </Link>
-            <Link href="/equipamento/get" className={navItem(pathname, '/equipamento/get')}>
-              <Search className="w-4 h-4" />
-              Consultar
-            </Link>
-            <Link href="/equipamento/update" className={navItem(pathname, '/equipamento/update')}>
-              <Pencil className="w-4 h-4" />
-              Editar
-            </Link>
+            {hasPermission('equipment:manage') && (
+              <Link href="/equipamento/create" className={navItem(pathname, '/equipamento/create')}>
+                <Plus className="w-4 h-4" /> Criar
+              </Link>
+            )}
+            {hasPermission('equipment:manage') && (
+              <Link href="/equipamento/delete" className={navItem(pathname, '/equipamento/delete')}>
+                <Trash2 className="w-4 h-4" /> Deletar
+              </Link>
+            )}
+            {hasPermission('equipment:read') && (
+              <Link href="/equipamento/get" className={navItem(pathname, '/equipamento/get')}>
+                <Search className="w-4 h-4" /> Consultar
+              </Link>
+            )}
+            {hasPermission('equipment:manage') && (
+              <Link href="/equipamento/update" className={navItem(pathname, '/equipamento/update')}>
+                <Pencil className="w-4 h-4" /> Editar
+              </Link>
+            )}
           </div>
         )}
-        
-        {hasPermission(['ADMIN', 'SUPER-ADMIN', 'USER-EQUIP-TRANSFER']) && (
+
+        {hasPermission('transfer:manage') && (
           <Link href="/transfer" className={navItem(pathname, '/transfer')}>
             <Repeat className="w-4 h-4" />
             {!collapsed && 'Transferência'}
-         </Link>
+          </Link>
         )}
 
-        {hasPermission(['ADMIN', 'SUPER-ADMIN']) && (
+        {hasPermission('user:manage') && (
           <>
             <button
               onClick={() => setOpenGestao(!openGestao)}
@@ -112,19 +104,16 @@ const Sidebar = ({ onLogout, collapsed, onToggle }: SidebarProps) => {
             >
               <Users className="w-4 h-4" />
               {!collapsed && <span className="flex-1 text-left">Gestão</span>}
-              {!collapsed &&
-                (openGestao ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
+              {!collapsed && (openGestao ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
             </button>
 
             {!collapsed && openGestao && (
               <div className="ml-6 space-y-1">
                 <Link href="/gestao/usuarios" className={navItem(pathname, '/gestao/usuarios')}>
-                  <UserPlus className="w-4 h-4" />
-                  Usuários
+                  <UserPlus className="w-4 h-4" /> Usuários
                 </Link>
                 <Link href="/gestao/permissoes" className={navItem(pathname, '/gestao/permissoes')}>
-                  <Shield className="w-4 h-4" />
-                  Permissões
+                  <Shield className="w-4 h-4" /> Permissões
                 </Link>
               </div>
             )}
@@ -137,9 +126,7 @@ const Sidebar = ({ onLogout, collapsed, onToggle }: SidebarProps) => {
         <DarkModeToggle />
         <button
           onClick={onLogout}
-          className={`flex items-center gap-2 text-sm text-red-500 hover:text-red-600 ${
-            collapsed ? 'justify-center' : ''
-          }`}
+          className={`flex items-center gap-2 text-sm text-red-500 hover:text-red-600 ${collapsed ? 'justify-center' : ''}`}
         >
           <LogOut className="w-4 h-4" />
           {!collapsed && 'Sair'}
