@@ -2,6 +2,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 
+// LISTA TODAS AS NOTIFICAÇÕES
 export async function listNotifications(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);
@@ -27,6 +28,7 @@ export async function listNotifications(req: FastifyRequest, reply: FastifyReply
   }
 }
 
+// FAZ A CONTAGEM DAS NOTIFICAÇÕES
 export async function unreadCount(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);
@@ -40,6 +42,7 @@ export async function unreadCount(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// MARCA NOTIFICAÇÃO COMO LIDA
 export async function markRead(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);
@@ -57,6 +60,7 @@ export async function markRead(req: FastifyRequest<{ Params: { id: string } }>, 
   }
 }
 
+// MARCA TODAS NOTIFICAÇÕES COMO LIDA
 export async function markAllRead(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);

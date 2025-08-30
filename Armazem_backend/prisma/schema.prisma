@@ -30,6 +30,7 @@ model Usuario {
   passwordResetToken PasswordResetToken[]
   notificacoes       Notificacao[]
   
+  estoqueTelegramNotify EstoqueTelegramNotify[]
   accessRequests   StockAccessRequest[] @relation("RequestOwner")
   approvedRequests StockAccessRequest[] @relation("StockRequestApprover")
 
@@ -72,7 +73,7 @@ model Estoque {
   itens                 EstoqueItem[]
 
   usuarios UsuarioEstoque[]
-
+  estoqueTelegramNotify EstoqueTelegramNotify[]
   requests StockAccessRequest[]
 
   @@map("estoques")
@@ -208,3 +209,19 @@ model PermissaoOnRoute {
   permissao Role  @relation(fields: [permissaoId], references: [id])
   route     Route @relation(fields: [routeId], references: [id])
 }
+
+model EstoqueTelegramNotify {
+  id         Int      @id @default(autoincrement())
+  usuarioId  Int?
+  estoqueId  Int
+  chatId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  estoque    Estoque  @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, estoqueId], name: "usuario_estoque_unique")
+  @@index([estoqueId])
+}
+

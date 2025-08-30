@@ -9,8 +9,8 @@ export function sha256(input: string) {
     return crypto.createHash('sha256').update(input).digest('hex')
 }
 
-const port = Number(process.env.SMTP_PORT || 465);
-const secure = port === 465;
+// const port = Number(process.env.SMTP_PORT || 465);
+// const secure = port === 465;
 
 export const mailer = nodemailer.createTransport({
     service: process.env.SMTP_HOST,

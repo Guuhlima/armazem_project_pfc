@@ -1,4 +1,3 @@
-// src/plugins/rbac.ts
 import fp from "fastify-plugin";
 import type { FastifyPluginCallback, FastifyRequest } from "fastify";
 
@@ -53,16 +52,23 @@ const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
     userHasPermission,
     requirePerm(perm: Permission) {
       return async (req: FastifyRequest) => {
-        const uid = req.user?.id;
+        const uid = (req.user as any)?.id;
+
+        // 1) Fallback rápido: permissões no token
+        const permsFromToken: string[] = (req.user as any)?.permissoes || [];
+        if (permsFromToken.includes(perm)) return;
+
+        // 2) Fluxo padrão via Redis
         if (uid == null) {
-          throw fastify.httpErrors.unauthorized("unauthorized");
+          throw fastify.httpErrors.unauthorized('unauthorized');
         }
         const ok = await userHasPermission(uid, perm);
         if (!ok) {
           throw fastify.httpErrors.forbidden(`missing permission: ${perm}`);
         }
       };
-    },
+    }
+
   });
 
   fastify.addHook("onRequest", async (req) => {
@@ -75,5 +81,6 @@ const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
 
   done();
 };
+
 
 export default fp(rbacPlugin, { name: "rbac-plugin" });

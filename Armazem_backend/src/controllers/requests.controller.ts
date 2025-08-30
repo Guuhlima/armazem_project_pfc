@@ -1,5 +1,7 @@
+// src/controllers/requests.controller.ts
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { syncUserRolesToRedis } from '../lib/rbac-sync';
 
 /** Helpers */
 async function isSuperAdmin(userId: number) {
@@ -24,11 +26,7 @@ export async function listRequests(req: FastifyRequest, reply: FastifyReply) {
 
     const items = await prisma.stockAccessRequest.findMany({
       where: status ? { status } : undefined,
-      include: {
-        estoque: true,
-        usuario: true,
-        approver: true,
-      },
+      include: { estoque: true, usuario: true, approver: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -56,7 +54,10 @@ export async function getRequestById(req: FastifyRequest<{ Params: { id: string 
 }
 
 /** POST /requests/:id/approve */
-export async function approveRequest(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+export async function approveRequest(
+  req: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
   try {
     const approverId = Number((req.user as any)?.id);
     if (!approverId) return reply.code(401).send({ error: 'não autenticado' });
@@ -64,7 +65,9 @@ export async function approveRequest(req: FastifyRequest<{ Params: { id: string 
     const id = Number(req.params.id);
     const item = await prisma.stockAccessRequest.findUnique({ where: { id } });
     if (!item) return reply.code(404).send({ error: 'Solicitação não encontrada' });
-    if (item.status !== 'PENDING') return reply.code(400).send({ error: 'Solicitação já decidida' });
+    if (item.status !== 'PENDING') {
+      return reply.code(409).send({ error: 'Solicitação já decidida' });
+    }
 
     const [superA, stockA] = await Promise.all([
       isSuperAdmin(approverId),
@@ -72,30 +75,56 @@ export async function approveRequest(req: FastifyRequest<{ Params: { id: string 
     ]);
     if (!superA && !stockA) return reply.code(403).send({ error: 'Sem permissão para aprovar' });
 
-    // Cria/garante vínculo do usuário ao estoque
-    await prisma.usuarioEstoque.upsert({
-      where: { usuarioId_estoqueId: { usuarioId: item.usuarioId, estoqueId: item.estoqueId } },
-      update: {},
-      create: { usuarioId: item.usuarioId, estoqueId: item.estoqueId }, // role padrão MEMBER
+    const result = await prisma.$transaction(async (tx) => {
+      // 1) Vincula usuário ao estoque como MEMBER
+      await tx.usuarioEstoque.upsert({
+        where: { usuarioId_estoqueId: { usuarioId: item.usuarioId, estoqueId: item.estoqueId } },
+        update: { role: 'MEMBER' },
+        create: { usuarioId: item.usuarioId, estoqueId: item.estoqueId, role: 'MEMBER' },
+      });
+
+      // 2) Garante role global USER-EQUIPAMENTOS (e remove 'usuarioPadrão' se existir)
+      const [roleUsuarioPadrao, roleUserEquip] = await Promise.all([
+        tx.role.findUnique({ where: { nome: 'usuarioPadrão' } }),
+        tx.role.findUnique({ where: { nome: 'USER-EQUIPAMENTOS' } }),
+      ]);
+      if (!roleUserEquip) throw new Error('Role USER-EQUIPAMENTOS não encontrada (seeds).');
+
+      if (roleUsuarioPadrao) {
+        await tx.usuarioRole.deleteMany({
+          where: { usuarioId: item.usuarioId, roleId: roleUsuarioPadrao.id },
+        });
+      }
+      await tx.usuarioRole.upsert({
+        where: { usuarioId_roleId: { usuarioId: item.usuarioId, roleId: roleUserEquip.id } },
+        update: {},
+        create: { usuarioId: item.usuarioId, roleId: roleUserEquip.id },
+      });
+
+      // 3) Atualiza a solicitação
+      const updatedReq = await tx.stockAccessRequest.update({
+        where: { id },
+        data: { status: 'APPROVED', approverId, decidedAt: new Date() },
+      });
+
+      // 4) Notifica solicitante (best-effort dentro da tx mesmo)
+      await tx.notificacao.create({
+        data: {
+          userId: item.usuarioId,
+          type: 'ACCESS_APPROVED',
+          title: 'Acesso ao armazém aprovado',
+          message: `Seu acesso ao armazém ${item.estoqueId} foi aprovado.`,
+          refId: id,
+        },
+      }).catch(() => { /* não falha a tx por notificação */ });
+
+      return { updatedReq, usuarioId: item.usuarioId };
     });
 
-    const updated = await prisma.stockAccessRequest.update({
-      where: { id },
-      data: { status: 'APPROVED', approverId, decidedAt: new Date() },
-    });
+    // 5) Atualiza RBAC no Redis para refletir permissões imediatamente
+    await syncUserRolesToRedis(req.server, result.usuarioId);
 
-    // Notifica solicitante
-    await prisma.notificacao.create({
-      data: {
-        userId: item.usuarioId,
-        type: 'ACCESS_APPROVED',
-        title: 'Acesso ao armazém aprovado',
-        message: `Seu acesso ao armazém ${item.estoqueId} foi aprovado.`,
-        refId: id,
-      },
-    });
-
-    return reply.send({ ok: true, request: updated });
+    return reply.send({ ok: true, request: result.updatedReq });
   } catch (err) {
     req.log.error({ err }, 'approveRequest error');
     return reply.code(500).send({ error: 'Erro ao aprovar solicitação' });
@@ -111,7 +140,9 @@ export async function rejectRequest(req: FastifyRequest<{ Params: { id: string }
     const id = Number(req.params.id);
     const item = await prisma.stockAccessRequest.findUnique({ where: { id } });
     if (!item) return reply.code(404).send({ error: 'Solicitação não encontrada' });
-    if (item.status !== 'PENDING') return reply.code(400).send({ error: 'Solicitação já decidida' });
+    if (item.status !== 'PENDING') {
+      return reply.code(409).send({ error: 'Solicitação já decidida' });
+    }
 
     const [superA, stockA] = await Promise.all([
       isSuperAdmin(approverId),
@@ -124,7 +155,7 @@ export async function rejectRequest(req: FastifyRequest<{ Params: { id: string }
       data: { status: 'REJECTED', approverId, decidedAt: new Date() },
     });
 
-    // Notifica solicitante
+    // Notifica solicitante (fora da tx é ok também)
     await prisma.notificacao.create({
       data: {
         userId: item.usuarioId,
@@ -133,7 +164,7 @@ export async function rejectRequest(req: FastifyRequest<{ Params: { id: string }
         message: `Seu acesso ao armazém ${item.estoqueId} foi rejeitado.`,
         refId: id,
       },
-    });
+    }).catch(() => {});
 
     return reply.send({ ok: true, request: updated });
   } catch (err) {

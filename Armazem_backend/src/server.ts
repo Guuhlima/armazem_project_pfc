@@ -1,4 +1,4 @@
-// server.ts (versão ajustada)
+// server.ts
 import Fastify from 'fastify'
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import cors from '@fastify/cors'
@@ -6,6 +6,8 @@ import jwt from '@fastify/jwt'
 import redis from '@fastify/redis'
 import dotenv from 'dotenv'
 import sensible from '@fastify/sensible'
+import cookie from '@fastify/cookie'
+import { hydrateRbacFromPrisma } from './utils/rbacHydrate';
 
 import { equipamentosRoutes } from './routes/equipment.routes'
 import { authRoutes } from './routes/auth.routes'
@@ -16,6 +18,10 @@ import { estoqueItensRoutes } from './routes/stockItens.routes'
 import { resetPasswordRoutes } from './routes/resetPassword.routes'
 import { notificationsRoutes } from 'routes/notificacoes.routes'
 import { requestsRoutes } from 'routes/requests.routes'
+import { adminUserStockRoutes } from './routes/adminUserStock.routes';
+
+import { estoqueNotifyRoutes } from './routes/estoqueNotify.routes';
+import '../src/service/telegram.service';
 
 import rbacPlugin from './plugins/rbac'
 
@@ -23,49 +29,72 @@ dotenv.config()
 
 const PORT = Number(process.env.PORT) || 4000
 const HOST = process.env.HOST ?? '0.0.0.0'
+const isProd = process.env.NODE_ENV === 'production'
+const WEB_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  process.env.WEB_ORIGIN ?? '',
+].filter(Boolean)
 
 const app = Fastify({ logger: true }).withTypeProvider<TypeBoxTypeProvider>()
 
+/* ---------- CORS (com credenciais) ---------- */
 await app.register(cors, {
   origin(origin, cb) {
-    const allow = ['http://localhost:3000', 'http://127.0.0.1:3000']
-    if (!origin) return cb(null, true)
-    if (allow.includes(origin)) return cb(null, true)
+    if (!origin) return cb(null, true) // permitir tools locais (curl, etc.)
+    if (WEB_ORIGINS.includes(origin)) return cb(null, true)
     cb(new Error('CORS not allowed'), false)
   },
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
-  credentials: true,
+  credentials: true, // 👈 obrigatório p/ cookies cross-site
 })
 
 await app.register(sensible)
 
-await app.register(jwt, { secret: process.env.JWT_SECRET! })
+/* ---------- Cookies devem vir ANTES do JWT ---------- */
+await app.register(cookie, {
+  // se quiser assinar cookies não-HttpOnly:
+  // secret: process.env.COOKIE_SECRET,
+})
 
-app.decorate('authenticate', async function (request: any, reply: any) {
-  try {
-    const payload = await request.jwtVerify();
-    request.user = {
-      id: (payload as any).sub ?? (payload as any).id,
-      nome: (payload as any).nome ?? null,
-      email: (payload as any).email ?? '',
-      permissoes: (payload as any).permissoes ?? [],
-    };
-  } catch (err) {
-    request.log.warn({ err }, 'unauthorized');
-    return reply.code(401).send({ error: 'unauthorized' });
-  }
-});
+/* ---------- JWT lendo do cookie accessToken ---------- */
+await app.register(jwt, {
+  secret: process.env.JWT_SECRET!,
+  cookie: {
+    cookieName: 'accessToken', // 👈 request.jwtVerify() vai buscar aqui
+    signed: false,
+  },
+})
 
+/* ---------- Redis + RBAC ---------- */
 await app.register(redis, { url: process.env.REDIS_URL ?? 'redis://localhost:6379' })
 await app.register(rbacPlugin)
+await hydrateRbacFromPrisma(app);
+
+/* ---------- Decorator authenticate (via cookie) ---------- */
+app.decorate('authenticate', async function (request: any, reply: any) {
+  try {
+    // Lê do cookie 'accessToken' por causa da opção em fastify-jwt acima
+    const payload = await request.jwtVerify()
+    request.user = {
+      id: payload?.sub ?? payload?.id,
+      nome: payload?.nome ?? null,
+      email: payload?.email ?? '',
+      permissoes: payload?.permissoes ?? [],
+    }
+  } catch (err) {
+    request.log.warn({ err }, 'unauthorized')
+    return reply.code(401).send({ error: 'unauthorized' })
+  }
+})
 
 /* ----------------- ROTAS ------------------ */
 
 // 🔓 públicas
-await app.register(authRoutes)
+await app.register(authRoutes)               // login deve setar cookies HttpOnly
 await app.register(resetPasswordRoutes)
-await app.register(usuariosRoutes, { prefix: '/user' });
+await app.register(usuariosRoutes, { prefix: '/user' })
 
 // 🔒 equipamentos
 await app.register(async (r) => {
@@ -73,14 +102,7 @@ await app.register(async (r) => {
   r.register(equipamentosRoutes)
 })
 
-// 🔒 usuários (CRUD) — RBAC correto: 'user:manage'
-// await app.register(async (r) => {
-//   r.addHook('onRequest', r.authenticate)
-//   r.addHook('preHandler', r.rbac.requirePerm('user:manage'))
-//   r.register(usuariosRoutes)
-// })
-
-// 🔒 transferências
+// 🔒 transferências (perm necessária)
 await app.register(async (r) => {
   r.addHook('onRequest', r.authenticate)
   r.addHook('preHandler', r.rbac.requirePerm('transfer:manage'))
@@ -94,14 +116,28 @@ await app.register(async (r) => {
   r.register(estoqueItensRoutes)
 })
 
+// 🔒 notificações
 await app.register(async (r) => {
   r.addHook('onRequest', r.authenticate)
   r.register(notificationsRoutes)
 })
 
+// 🔒 solicitações
+await app.register(async (r) => {
+  r.addHook('onRequest', r.authenticate)
+  r.register(requestsRoutes, { prefix: '/requests' })
+})
+
+// 🔒 telegram notify (gestão)
+await app.register(async (r) => {
+  r.addHook('onRequest', r.authenticate); // já resolve auth aqui
+  r.register(estoqueNotifyRoutes);        // sem prefixo extra
+});
+
+// 🔒 admin: role por usuário/estoque
 await app.register(async (r) => {
   r.addHook('onRequest', r.authenticate);
-  r.register(requestsRoutes, { prefix: '/requests' });
+  r.register(adminUserStockRoutes);
 });
 
 await app.ready()

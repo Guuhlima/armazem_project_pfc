@@ -10,7 +10,6 @@
     "start": "node dist/server.js",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watchAll",
-
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "rbac:sync": "tsx scripts/sync-rbac-redis.ts"
@@ -27,6 +26,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.1.0",
     "@fastify/jwt": "^10.0.0",
     "@fastify/redis": "^7.0.2",
@@ -39,6 +39,7 @@
     "fastify": "^5.5.0",
     "fastify-type-provider-zod": "^5.0.3",
     "ioredis": "^5.7.0",
+    "node-telegram-bot-api": "^0.66.0",
     "nodemailer": "^7.0.5",
     "zod": "^4.0.15"
   },
@@ -50,6 +51,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.11",
+    "@types/node-telegram-bot-api": "^0.64.10",
     "@types/nodemailer": "^7.0.0",
     "jest": "^30.0.5",
     "jsonwebtoken": "^9.0.2",
