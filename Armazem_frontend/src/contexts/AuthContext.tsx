@@ -1,6 +1,8 @@
 // src/contexts/AuthContext.tsx
 'use client';
+
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api, { apiAuth } from '@/services/api';
 
 type User = { id: number; nome: string | null; email: string };
@@ -11,64 +13,118 @@ interface AuthContextType {
   perms: string[];
   ready: boolean;
   isAuthenticated: boolean;
-  logout: () => void;
-  hasPermission: (perm: string | string[]) => boolean;
+  reload: () => Promise<void>;
+  logout: () => Promise<void>;
+  hasPermission: (permOrRole: string | string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as any);
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
+  const [user, setUser]   = useState<User | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [perms, setPerms] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
 
+  /** Helpers */
+  function setAxiosAuthHeader(token: string | null) {
+    if (token) {
+      api.defaults.headers.common.Authorization = `Bearer ${token}`;
+      apiAuth.defaults.headers.common.Authorization = `Bearer ${token}`;
+    } else {
+      delete api.defaults.headers.common.Authorization;
+      delete apiAuth.defaults.headers.common.Authorization;
+    }
+  }
+
   async function fetchMe() {
     try {
-      const { data } = await api.get('/user/me'); // requer accessToken
+      const { data } = await api.get('/user/me', { withCredentials: true });
       setUser(data.user ?? null);
       setRoles(data.roles ?? []);
       setPerms(data.perms ?? []);
     } catch {
-      setUser(null); setRoles([]); setPerms([]);
+      setUser(null);
+      setRoles([]);
+      setPerms([]);
     } finally {
       setReady(true);
     }
   }
 
-  useEffect(() => {
-    const at = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (at) fetchMe();
-    else setReady(true); // não autenticado
-  }, []);
+  /** Public API do contexto */
+  const reload = async () => {
+    setReady(false);
+    await fetchMe();
+  };
 
-  const logout = () => {
+  const logout = async () => {
     try {
       const rt = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-      if (rt) apiAuth.post('/user/logout', { refreshToken: rt }).catch(() => {});
+      if (rt) {
+        await apiAuth.post('/user/logout', { refreshToken: rt }, { withCredentials: true }).catch(() => {});
+      }
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
       }
-      setUser(null); setRoles([]); setPerms([]);
-      window.location.href = '/';
+      setAxiosAuthHeader(null);
+      setUser(null);
+      setRoles([]);
+      setPerms([]);
+
+      // notifica app e força novas fetches
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:changed'));
+      }
+
+      router.replace('/auth/login');
+      router.refresh();
     }
   };
 
-  const hasPermission = (perm: string | string[]) => {
-    if (!ready) return false;                 // 🔒 antes de carregar, nunca libera
+  const hasPermission = (permOrRole: string | string[]) => {
+    if (!ready) return false;
+    // SUPER-ADMIN libera tudo
     if (roles.includes('SUPER-ADMIN')) return true;
-    if (Array.isArray(perm)) return perm.some((p) => perms.includes(p));
-    return perms.includes(perm);
+
+    const has = (s: string) =>
+      roles.includes(s) || perms.includes(s); // aceita tanto role code quanto permission code
+
+    if (Array.isArray(permOrRole)) return permOrRole.some(has);
+    return has(permOrRole);
   };
+
+  /** Bootstrap do contexto */
+  useEffect(() => {
+    const at = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    setAxiosAuthHeader(at);
+    if (at) fetchMe();
+    else setReady(true);
+
+    // quando alguém faz login/logout e emite 'auth:changed', recarregamos o /me
+    const onAuthChanged = () => reload();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth:changed', onAuthChanged);
+      return () => window.removeEventListener('auth:changed', onAuthChanged);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const value = useMemo(
     () => ({
-      user, roles, perms, ready,
-      isAuthenticated: !!user && !!(typeof window !== 'undefined' && localStorage.getItem('accessToken')),
-      logout, hasPermission,
+      user,
+      roles,
+      perms,
+      ready,
+      isAuthenticated: !!user,
+      reload,
+      logout,
+      hasPermission,
     }),
     [user, roles, perms, ready]
   );

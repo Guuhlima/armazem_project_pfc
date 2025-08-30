@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Warehouse, Plus, Trash2, Search, Pencil, Repeat, LogOut,
   ChevronsLeft, ChevronsRight, ChevronDown, ChevronRight,
-  Package, Users, UserPlus, Shield,
+  Package, Users, UserPlus, Shield, UserRoundCheck
 } from 'lucide-react';
 import { useState } from 'react';
 import DarkModeToggle from './DarkModeToggle';
@@ -13,40 +13,41 @@ import { useAuth } from '@/contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 
 interface SidebarProps {
-  onLogout: (e: React.MouseEvent) => void;
   collapsed: boolean;
   onToggle: () => void;
 }
 
-const Sidebar = ({ onLogout, collapsed, onToggle }: SidebarProps) => {
+const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const pathname = usePathname();
   const [openEquipamento, setOpenEquipamento] = useState(false);
   const [openGestao, setOpenGestao] = useState(false);
-  const { hasPermission } = useAuth();
+  const { hasPermission, logout } = useAuth(); // 👈 pega logout do contexto
+
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    await logout(); // limpa cookie + caches + redireciona (implementado no AuthContext)
+  };
 
   return (
     <aside
       className={`h-screen ${collapsed ? 'w-16' : 'w-60'} transition-all duration-300 fixed left-0 top-0 z-50
         border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white`}
     >
-        <div className="flex items-center justify-between px-4 py-5 text-xl font-bold border-b border-zinc-200 dark:border-zinc-800">
-          <Link href="/home" className="flex items-center gap-2 hover:opacity-80 transition">
-            <Warehouse className="w-6 h-6 text-blue-500" />
-            {!collapsed && <span>Estoque</span>}
-          </Link>
+      <div className="flex items-center justify-between px-4 py-5 text-xl font-bold border-b border-zinc-200 dark:border-zinc-800">
+        <Link href="/home" className="flex items-center gap-2 hover:opacity-80 transition">
+          <Warehouse className="w-6 h-6 text-blue-500" />
+          {!collapsed && <span>Estoque</span>}
+        </Link>
 
-          <div className="flex items-center gap-2">
-            {!collapsed && <NotificationBell />}  {/* 👈 só mostra aberto */}
-            <button onClick={onToggle} className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white">
-              {collapsed ? <ChevronsRight className="w-5 h-5" /> : <ChevronsLeft className="w-5 h-5" />}
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          {!collapsed && <NotificationBell />}
+          <button onClick={onToggle} className="text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white">
+            {collapsed ? <ChevronsRight className="w-5 h-5" /> : <ChevronsLeft className="w-5 h-5" />}
+          </button>
         </div>
+      </div>
 
       <nav className="flex-1 px-2 py-4 space-y-1">
-
-
-
         <button
           onClick={() => setOpenEquipamento(!openEquipamento)}
           className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${
@@ -115,17 +116,19 @@ const Sidebar = ({ onLogout, collapsed, onToggle }: SidebarProps) => {
                 <Link href="/gestao/permissoes" className={navItem(pathname, '/gestao/permissoes')}>
                   <Shield className="w-4 h-4" /> Permissões
                 </Link>
+                <Link href="/gestao/solicitacoes" className={navItem(pathname, '/gestao/solicitacoes')}>
+                  <UserRoundCheck className="w-4 h-4" /> Solicitações
+                </Link>
               </div>
             )}
           </>
         )}
-
       </nav>
 
       <div className="px-4 py-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
         <DarkModeToggle />
         <button
-          onClick={onLogout}
+          onClick={handleLogout}
           className={`flex items-center gap-2 text-sm text-red-500 hover:text-red-600 ${collapsed ? 'justify-center' : ''}`}
         >
           <LogOut className="w-4 h-4" />

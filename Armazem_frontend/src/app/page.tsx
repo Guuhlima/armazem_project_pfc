@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Mail, Lock } from 'lucide-react';
-import { apiAuth } from '@/services/api'; 
+import api, { apiAuth } from '@/services/api';
 import { useIsClient } from '@/hooks/useIsClient';
 
 export default function Login() {
@@ -16,23 +16,37 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const isClient = useIsClient();
-  if(!isClient) return null;
+  if (!isClient) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await apiAuth.post('/user/login', { email, senha });
+      const res = await apiAuth.post(
+        '/user/login',
+        { email, senha },
+        { withCredentials: true } // 👈 garante cookies HttpOnly, se usados
+      );
 
       const { accessToken, refreshToken, token, user } = res.data || {};
-      const at = accessToken ?? token; // compat
+      const at = accessToken ?? token;
       if (!at) throw new Error('Token não retornado pelo backend');
 
+      // Persiste tokens
       localStorage.setItem('accessToken', at);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       if (user) localStorage.setItem('user', JSON.stringify(user));
 
-      router.push('/home');
+      // Atualiza axios imediatamente (sem precisar recarregar)
+      api.defaults.headers.common.Authorization = `Bearer ${at}`;
+      apiAuth.defaults.headers.common.Authorization = `Bearer ${at}`;
+
+      // Notifica o app para refazer /user/me
+      window.dispatchEvent(new Event('auth:changed'));
+
+      // Navega e força revalidação
+      router.replace('/home');
+      router.refresh();
     } catch (error: any) {
       console.error('Erro ao realizar login:', error);
       const msg =
@@ -56,8 +70,12 @@ export default function Login() {
       >
         <Card className="rounded-2xl shadow-2xl">
           <CardContent className="p-8 space-y-6">
-            <h2 className="text-3xl font-bold text-center text-zinc-800 dark:text-white">Acesso ao Sistema</h2>
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">Insira suas credenciais para continuar</p>
+            <h2 className="text-3xl font-bold text-center text-zinc-800 dark:text-white">
+              Acesso ao Sistema
+            </h2>
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+              Insira suas credenciais para continuar
+            </p>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
