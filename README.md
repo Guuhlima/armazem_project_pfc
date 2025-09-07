@@ -28,7 +28,10 @@ armazem_project_pfc/
    `git clone https://github.com/seu-usuario/seu-repo.git`  
    `cd armazem_project_pfc`  
 
-2. Configurar variáveis de ambiente:  
+2. Rodar o docker-compose
+   `acesse a pasta Armazem_backend e no CMD/TERMINAL rode o docker-compose up --build`
+
+3. Configurar variáveis de ambiente:  
 
    **Backend (.env):**  
    `DATABASE_URL="postgresql://user:pass@localhost:5432/estoque_db?schema=public"`  
@@ -38,7 +41,7 @@ armazem_project_pfc/
    **Frontend (.env.local):**  
    `NEXT_PUBLIC_API_URL="http://localhost:3333"`  
 
-3. Instalar dependências:  
+4. Instalar dependências:  
    **Backend:**  
    `cd Armazem_backend`  
    `npm install`  
@@ -47,11 +50,11 @@ armazem_project_pfc/
    `cd ../armazem_frontend`  
    `npm install`  
 
-4. Criar e migrar o banco de dados:  
+5. Criar e migrar o banco de dados:  
    `cd ../Armazem_backend`  
    `npx prisma migrate dev`  
 
-5. Rodar em modo desenvolvimento:  
+6. Rodar em modo desenvolvimento:  
    **Backend:**  
    `npm run dev` → http://localhost:3333  
    **Frontend:**  
