@@ -23,7 +23,6 @@ export async function issueTokens(app: FastifyInstance, user: UserLike): Promise
   const jti = randomUUID();
   const now = Math.floor(Date.now() / 1000);
 
-  // Access token: incluem só os campos que existirem (evita TS reclamar)
   const accessToken = app.jwt.sign(
     {
       sub: user.id,
@@ -34,10 +33,8 @@ export async function issueTokens(app: FastifyInstance, user: UserLike): Promise
     { expiresIn: ACCESS_TTL }
   );
 
-  // Refresh token: com jti
   const refreshToken = app.jwt.sign({ sub: user.id, jti }, { expiresIn: REFRESH_TTL });
 
-  // Sessão no Redis
   await app.redis
     .multi()
     .hmset(sessionKey(jti), { userId: String(user.id), valid: '1', iat: String(now) })

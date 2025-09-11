@@ -63,7 +63,6 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
     const requesterId = Number((req.user as any)?.id);
     if (!requesterId) return reply.code(401).send({ error: 'unauthorized' });
 
-    // É SUPER-ADMIN global?
     const isSuperAdmin = await prisma.usuarioRole.findFirst({
       where: {
         usuarioId: requesterId,
@@ -73,13 +72,12 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
     });
 
     if (isSuperAdmin) {
-      // SUPER-ADMIN vê todos
       const users = await prisma.usuario.findMany({
         select: {
           id: true,
           nome: true,
           email: true,
-          roles: { include: { role: true } }, // traz roles globais p/ montar permissoes
+          roles: { include: { role: true } },
         },
         orderBy: { id: 'asc' },
       });
@@ -89,12 +87,11 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
           id: u.id,
           nome: u.nome,
           email: u.email,
-          permissoes: (u.roles ?? []).map(r => r.role.nome), // ['SUPER-ADMIN','ADMIN',...]
+          permissoes: (u.roles ?? []).map(r => r.role.nome), 
         }))
       );
     }
 
-    // Se não é SUPER-ADMIN, é ADMIN? (pode refinar com RBAC/Redis via req.hasPermission('user:manage'))
     const isAdmin = await prisma.usuarioRole.findFirst({
       where: {
         usuarioId: requesterId,
@@ -104,11 +101,9 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
     });
 
     if (!isAdmin) {
-      // Sem papel suficiente → vazio (ou troque por 403 se preferir bloquear)
       return reply.send([]);
     }
 
-    // Estoques onde o requester é ADMIN
     const meusEstoques = await prisma.usuarioEstoque.findMany({
       where: { usuarioId: requesterId, role: 'ADMIN' },
       select: { estoqueId: true },
@@ -116,7 +111,6 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
     const estoqueIds = [...new Set(meusEstoques.map(e => e.estoqueId))];
     if (estoqueIds.length === 0) return reply.send([]);
 
-    // Usuários vinculados a QUALQUER desses estoques
     const vinculados = await prisma.usuarioEstoque.findMany({
       where: { estoqueId: { in: estoqueIds } },
       select: {
@@ -125,13 +119,12 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
             id: true,
             nome: true,
             email: true,
-            roles: { include: { role: true } }, // p/ montar permissoes
+            roles: { include: { role: true } },
           },
         },
       },
     });
 
-    // Distinct por usuário
     const map = new Map<number, { id: number; nome: string | null; email: string; permissoes: string[] }>();
     for (const v of vinculados) {
       const u = v.usuario;

@@ -1,0 +1,12 @@
+FROM node:20-alpine
+WORKDIR /app
+
+# Dependências
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Código
+COPY . .
+
+EXPOSE 3000
+CMD ["npm", "run", "dev"]

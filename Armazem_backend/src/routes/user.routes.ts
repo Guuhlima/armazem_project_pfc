@@ -12,7 +12,6 @@ import {
 } from '../schemas/user.schema';
 
 export async function usuariosRoutes(app: FastifyInstance) {
-  // público: POST /user/cadastro
   app.post('/cadastro', { schema: { body: UsuarioBodySchema } }, cadastrarUsuarios);
 
   // protegido: GET /user/visualizar, /user/visualizar/:id, PUT /user/editar/:id

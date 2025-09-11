@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: armazem
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./Armazem_backend
+      dockerfile: Dockerfile.dev
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://admin:admin123@db:5432/armazem?schema=public
+      JWT_SECRET: dev_secret
+      PORT: 3001
+    volumes:
+      - ./Armazem_backend:/app
+      - /app/node_modules
+    depends_on:
+      - db
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./Armazem_frontend
+      dockerfile: Dockerfile.dev
+    command: npm run dev -- -p 3000
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001
+      PORT: 3000
+    volumes:
+      - ./Armazem_frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata_dev:
