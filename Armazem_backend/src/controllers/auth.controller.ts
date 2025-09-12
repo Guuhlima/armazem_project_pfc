@@ -27,11 +27,9 @@ const cookieOpts = {
   httpOnly: true,
   sameSite: 'lax' as const,
   secure: isProd,
-  // domain: 'seu-dominio.com', // se necessário em prod
 };
 
 function setAuthCookies(reply: FastifyReply, tokens: { accessToken: string; refreshToken: string }) {
-  // Se você quer trafegar 100% por cookie HttpOnly:
   reply.setCookie('accessToken', tokens.accessToken, cookieOpts);
   reply.setCookie('refreshToken', tokens.refreshToken, cookieOpts);
 }
@@ -41,7 +39,6 @@ function clearAuthCookies(reply: FastifyReply) {
   reply.clearCookie('refreshToken', cookieOpts);
 }
 
-/** ===================== AUTH ===================== **/
 
 export async function login(
   req: FastifyRequest<{ Body: LoginBody }>,
@@ -79,14 +76,12 @@ export async function login(
       nome: user.nome ?? null,
       email: user.email,
     });
-
-    // Opcional: setar cookies HttpOnly (recomendado)
     setAuthCookies(reply, tokens);
 
     return reply.send({
       message: 'Login realizado com sucesso',
       user: { id: user.id, nome: user.nome, email: user.email },
-      ...tokens, // mantenho no payload se seu front depende disso
+      ...tokens,
     });
   } catch (err) {
     req.server.log.error({ err }, 'login error');

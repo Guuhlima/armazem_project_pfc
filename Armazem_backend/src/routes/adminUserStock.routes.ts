@@ -6,7 +6,6 @@ export async function adminUserStockRoutes(app: FastifyInstance) {
   app.register(async (r) => {
     r.addHook('onRequest', r.authenticate);
 
-    // GET papel do usuário num estoque (com fallback SUPER-ADMIN)
     r.get('/admin/usuarios/:userId/estoques/:estoqueId/role', {
       preHandler: [r.rbac.requirePerm('user:manage')],
       handler: async (req: any, reply) => {
@@ -22,7 +21,6 @@ export async function adminUserStockRoutes(app: FastifyInstance) {
           return reply.send({ role: row.role, inherited: false });
         }
 
-        // Fallback: tem SUPER-ADMIN global?
         const superAdmin = await prisma.usuarioRole.findFirst({
           where: {
             usuarioId: userId,
@@ -32,7 +30,6 @@ export async function adminUserStockRoutes(app: FastifyInstance) {
         });
 
         if (superAdmin) {
-          // Tratamos como ADMIN herdado nesse estoque (sem gravar DB)
           return reply.send({ role: 'ADMIN', inherited: true });
         }
 
@@ -40,7 +37,6 @@ export async function adminUserStockRoutes(app: FastifyInstance) {
       },
     });
 
-    // PUT define/atualiza papel explícito no estoque
     r.put('/admin/usuarios/:userId/estoques/:estoqueId/role', {
       preHandler: [r.rbac.requirePerm('user:manage')],
       handler: async (req: any, reply) => {

@@ -14,7 +14,6 @@ import {
 export async function usuariosRoutes(app: FastifyInstance) {
   app.post('/cadastro', { schema: { body: UsuarioBodySchema } }, cadastrarUsuarios);
 
-  // protegido: GET /user/visualizar, /user/visualizar/:id, PUT /user/editar/:id
   app.register(async (r) => {
     r.addHook('onRequest', r.authenticate);
     r.addHook('preHandler', r.rbac.requirePerm('user:manage'));
@@ -23,7 +22,6 @@ export async function usuariosRoutes(app: FastifyInstance) {
     r.put('/editar/:id', { schema: { params: UsuarioParamsSchema, body: UsuarioBodySchema }, handler: editarUsuarios });
   });
 
-  // protegido: DELETE /user/deletar/:id
   app.register(async (r) => {
     r.addHook('onRequest', r.authenticate);
     r.addHook('preHandler', r.rbac.requirePerm('user:delete'));

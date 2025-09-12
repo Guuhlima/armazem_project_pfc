@@ -36,6 +36,7 @@
     "@fastify/type-provider-typebox": "^5.2.0",
     "@prisma/client": "^6.16.0",
     "@sinclair/typebox": "^0.34.38",
+    "amqplib": "^0.10.9",
     "bcrypt": "^6.0.0",
     "fastify": "^5.5.0",
     "fastify-type-provider-zod": "^5.0.3",

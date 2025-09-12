@@ -81,14 +81,14 @@ export const NotificationService = {
     }).format(t.quando);
 
     const telegramText =
-`📦 *Nova transferência de equipamento*
-*Item:* ${t.itemNome}
-*Quantidade:* ${t.quantidade}
-*De:* #${t.estoqueOrigemId} → *Para:* #${t.estoqueDestinoId}
-*Por:* ${t.usuario}
-*ID:* ${t.transferenciaId}
-*Quando:* ${quandoFmt}
-`;
+      `📦 *Nova transferência de equipamento*
+      *Item:* ${t.itemNome}
+      *Quantidade:* ${t.quantidade}
+      *De:* #${t.estoqueOrigemId} → *Para:* #${t.estoqueDestinoId}
+      *Por:* ${t.usuario}
+      *ID:* ${t.transferenciaId}
+      *Quando:* ${quandoFmt}
+      `;
 
     await Promise.all([
       // Aviso para admins do estoque de origem

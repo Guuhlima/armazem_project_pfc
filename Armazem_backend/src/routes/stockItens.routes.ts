@@ -15,14 +15,12 @@ export async function estoqueItensRoutes(app: FastifyInstance) {
   app.register(async (r) => {
     r.addHook('preHandler', verifyToken);
 
-    // MANAGE
     r.post('/stockmovi/cadastro/:id/adicionar-equipamento', {
       schema: { params: EstoqueItemParamsSchema, body: EstoqueItemBodySchema },
       preHandler: [r.rbac.requirePerm('stock:manage')],
       handler: adicionarItemAoEstoque,
     });
 
-    // READ
     r.get('/stockmovi/visualizar/:id/itens', {
       schema: { params: EstoqueItemParamsSchema },
       preHandler: [r.rbac.requirePerm('stock:read')],
