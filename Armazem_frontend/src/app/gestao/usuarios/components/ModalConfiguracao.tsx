@@ -1,15 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem
-} from '@/components/ui/select';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { api } from '@/services/api';
@@ -24,6 +20,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
+function getErr(e: unknown, fallback = 'Ocorreu um erro') {
+  const any = e as any;
+  return any?.response?.data?.error || any?.message || fallback;
+}
+
 export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Props) {
   const [estoques, setEstoques] = useState<Estoque[]>([]);
   const [selectedEstoqueId, setSelectedEstoqueId] = useState<number | null>(null);
@@ -36,28 +37,23 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
   const [loadingTest, setLoadingTest] = useState(false);
   const [loadingRole, setLoadingRole] = useState(false);
 
-  const canSave = useMemo(() => !!selectedEstoqueId, [selectedEstoqueId]);
+  const canSelect = useMemo(() => !!selectedEstoqueId, [selectedEstoqueId]);
+  const canSaveChat = useMemo(() => !!selectedEstoqueId && !!chatId.trim(), [selectedEstoqueId, chatId]);
+  const canTest = canSaveChat;
 
-  // Carrega estoques quando abrir
   useEffect(() => {
     if (!open) return;
-
     const ctrl = new AbortController();
     (async () => {
       try {
         setLoadingList(true);
-        const { data } = await api.get<EstoquesResponse>('/estoques/disponiveis', {
-          signal: ctrl.signal,
-          withCredentials: true,
-        });
-
+        const { data } = await api.get<EstoquesResponse>('/estoques/disponiveis', { signal: ctrl.signal, withCredentials: true });
         const items: Estoque[] = Array.isArray(data) ? data : ('items' in data ? data.items : []);
         setEstoques(items);
         setSelectedEstoqueId(items[0]?.id ?? null);
       } catch (e) {
         if (!ctrl.signal.aborted) {
-          console.error(e);
-          toast.error('Falha ao carregar estoques');
+          toast.error(getErr(e, 'Falha ao carregar estoques'));
           setEstoques([]);
           setSelectedEstoqueId(null);
         }
@@ -65,18 +61,14 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
         if (!ctrl.signal.aborted) setLoadingList(false);
       }
     })();
-
     return () => ctrl.abort();
   }, [open]);
 
-  // Carrega chatId e role ao trocar de estoque
   useEffect(() => {
     if (!selectedEstoqueId) return;
-
     const ctrl = new AbortController();
     (async () => {
       try {
-        // chatId do estoque
         const chatRes = await api.get<{ chatId: string | null }>(
           `/estoques/${selectedEstoqueId}/notify/telegram`,
           { signal: ctrl.signal, withCredentials: true }
@@ -85,41 +77,51 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
       } catch {
         setChatId('');
       }
-
       try {
-        // papel do usuário no estoque
-      const roleRes = await api.get<{ role: 'ADMIN' | 'MEMBER' | null; inherited?: boolean }>(
-        `/admin/usuarios/${userId}/estoques/${selectedEstoqueId}/role`
-      );
-      setRole(roleRes.data?.role ?? '');
+        const roleRes = await api.get<{ role: 'ADMIN' | 'MEMBER' | null; inherited?: boolean }>(
+          `/admin/usuarios/${userId}/estoques/${selectedEstoqueId}/role`,
+          { signal: ctrl.signal, withCredentials: true }
+        );
+        setRole(roleRes.data?.role ?? '');
       } catch {
         setRole('');
       }
     })();
-
     return () => ctrl.abort();
   }, [selectedEstoqueId, userId]);
 
+  useEffect(() => {
+    if (!open) {
+      setEstoques([]);
+      setSelectedEstoqueId(null);
+      setChatId('');
+      setRole('');
+      setLoadingList(false);
+      setLoadingSaveChat(false);
+      setLoadingTest(false);
+      setLoadingRole(false);
+    }
+  }, [open]);
+
   async function handleSalvarTelegram() {
-    if (!selectedEstoqueId) return;
+    if (!selectedEstoqueId || !chatId.trim()) return;
     setLoadingSaveChat(true);
     try {
       await api.post(
         `/estoques/${selectedEstoqueId}/notify/telegram`,
-        { chatId },
+        { chatId: chatId.trim() },
         { withCredentials: true }
       );
       toast.success('Chat do Telegram salvo!');
-    } catch (e: any) {
-      console.error(e?.response?.data || e);
-      toast.error(e?.response?.data?.error ?? 'Não foi possível salvar o chat do Telegram');
+    } catch (e) {
+      toast.error(getErr(e, 'Não foi possível salvar o chat do Telegram'));
     } finally {
       setLoadingSaveChat(false);
     }
   }
 
   async function handleTesteEnvio() {
-    if (!selectedEstoqueId) return;
+    if (!selectedEstoqueId || !chatId.trim()) return;
     setLoadingTest(true);
     try {
       await api.post(
@@ -128,9 +130,8 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
         { withCredentials: true }
       );
       toast.success('Mensagem de teste enviada!');
-    } catch (e: any) {
-      console.error(e?.response?.data || e);
-      toast.error(e?.response?.data?.error ?? 'Falha ao enviar mensagem de teste');
+    } catch (e) {
+      toast.error(getErr(e, 'Falha ao enviar mensagem de teste'));
     } finally {
       setLoadingTest(false);
     }
@@ -146,9 +147,8 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
         { withCredentials: true }
       );
       toast.success('Permissão atualizada!');
-    } catch (e: any) {
-      console.error(e?.response?.data || e);
-      toast.error(e?.response?.data?.error ?? 'Falha ao salvar permissão');
+    } catch (e) {
+      toast.error(getErr(e, 'Falha ao salvar permissão'));
     } finally {
       setLoadingRole(false);
     }
@@ -161,7 +161,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
           <DialogTitle>Configurar usuário #{userId}</DialogTitle>
         </DialogHeader>
 
-        {/* Estoque */}
         <div className="space-y-2">
           <Label>Estoque</Label>
           <Select
@@ -187,7 +186,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
 
         <Separator className="my-2" />
 
-        {/* Telegram */}
         <div className="space-y-3">
           <div className="font-medium">Notificações no Telegram</div>
           <p className="text-sm text-muted-foreground">
@@ -212,20 +210,20 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
                 value={chatId}
                 onChange={(e) => setChatId(e.target.value)}
                 placeholder="ex.: 123456789 ou -100123..."
-                disabled={!canSave}
+                disabled={!canSelect}
               />
             </div>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
                 onClick={handleSalvarTelegram}
-                disabled={!canSave || loadingSaveChat}
+                disabled={!canSaveChat || loadingSaveChat}
               >
                 {loadingSaveChat ? 'Salvando...' : 'Salvar'}
               </Button>
               <Button
                 onClick={handleTesteEnvio}
-                disabled={!canSave || loadingTest}
+                disabled={!canTest || loadingTest}
               >
                 {loadingTest ? 'Enviando...' : 'Enviar teste'}
               </Button>
@@ -243,7 +241,7 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
               <Select
                 value={role}
                 onValueChange={(v) => setRole(v as Papel)}
-                disabled={!canSave}
+                disabled={!canSelect}
               >
                 <SelectTrigger id="role">
                   <SelectValue placeholder="Selecione um papel" />
@@ -262,7 +260,7 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
             <Button
               variant="secondary"
               onClick={handleSalvarRole}
-              disabled={!role || !canSave || loadingRole}
+              disabled={!role || !canSelect || loadingRole}
             >
               {loadingRole ? 'Salvando...' : 'Salvar papel'}
             </Button>

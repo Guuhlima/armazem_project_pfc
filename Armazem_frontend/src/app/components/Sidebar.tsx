@@ -119,6 +119,9 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 <Link href="/gestao/solicitacoes" className={navItem(pathname, '/gestao/solicitacoes')}>
                   <UserRoundCheck className="w-4 h-4" /> Solicitações
                 </Link>
+                <Link href="/gestao/relatorio" className={navItem(pathname, '/gestao/relatorio')}>
+                  <UserRoundCheck className='w-4 h-4' /> Relatorio
+                </Link>
               </div>
             )}
           </>
