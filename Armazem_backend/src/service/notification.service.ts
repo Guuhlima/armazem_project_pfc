@@ -5,10 +5,10 @@ import { TelegramService } from './telegram.service';
 export const NotificationService = {
   // Notificação genérica (in-app)
   async notifyUserInApp(userId: number, data: {
-    type: string;           // ex.: 'transfer', 'access_request'
+    type: string;
     title: string;
     message?: string;
-    refId?: number | null;  // ID de referência (transferência, solicitação, etc.)
+    refId?: number | null;
   }) {
     return prisma.notificacao.create({
       data: {
@@ -27,7 +27,7 @@ export const NotificationService = {
     title: string;
     message?: string;
     refId?: number | null;
-    telegramText?: string;  // se presente, enviamos no Telegram
+    telegramText?: string;
   }) {
     const adminUserIds = await resolveEstoqueAdmins(estoqueId);
 
@@ -48,7 +48,6 @@ export const NotificationService = {
       );
     }
 
-    // 2) TELEGRAM
     if (payload.telegramText) {
       try {
         const chatIds = await getEstoqueChatIds(estoqueId);
@@ -65,7 +64,6 @@ export const NotificationService = {
     }
   },
 
-  // Caso específico: transferência
   async notifyTransferencia(params: {
     estoqueOrigemId: number;
     estoqueDestinoId: number;
@@ -81,13 +79,13 @@ export const NotificationService = {
     }).format(t.quando);
 
     const telegramText =
-      `📦 *Nova transferência de equipamento*
-      *Item:* ${t.itemNome}
-      *Quantidade:* ${t.quantidade}
-      *De:* #${t.estoqueOrigemId} → *Para:* #${t.estoqueDestinoId}
-      *Por:* ${t.usuario}
-      *ID:* ${t.transferenciaId}
-      *Quando:* ${quandoFmt}
+        `📦 *Nova transferência de equipamento*
+        *Item:* ${t.itemNome}
+        *Quantidade:* ${t.quantidade}
+        *De:* #${t.estoqueOrigemId} → *Para:* #${t.estoqueDestinoId}
+        *Por:* ${t.usuario}
+        *ID:* ${t.transferenciaId}
+        *Quando:* ${quandoFmt}
       `;
 
     await Promise.all([
@@ -128,11 +126,11 @@ export const NotificationService = {
       (s.motivo ? ` (motivo: ${s.motivo})` : '');
 
     const telegramText =
-`🔐 *Nova solicitação de acesso ao estoque #${s.estoqueId}*
-*Solicitante:* ${s.solicitante}
-${s.motivo ? `*Motivo:* ${s.motivo}\n` : ''}*ID:* ${s.solicitacaoId}
-*Quando:* ${quandoFmt}
-`;
+      `🔐 *Nova solicitação de acesso ao estoque #${s.estoqueId}*
+      *Solicitante:* ${s.solicitante}
+      ${s.motivo ? `*Motivo:* ${s.motivo}\n` : ''}*ID:* ${s.solicitacaoId}
+      *Quando:* ${quandoFmt}
+    `;
 
     await this.notifyEstoqueAdmins(s.estoqueId, {
       type: 'access_request',
@@ -144,14 +142,12 @@ ${s.motivo ? `*Motivo:* ${s.motivo}\n` : ''}*ID:* ${s.solicitacaoId}
   },
 };
 
-// ===== Helpers =====
-
 // Admins do estoque: pega usuários com role ADMIN na tabela de junção
 async function resolveEstoqueAdmins(estoqueId: number): Promise<number[]> {
   const admins = await prisma.usuarioEstoque.findMany({
     where: {
       estoqueId,
-      role: 'ADMIN', // StockRole.ADMIN
+      role: 'ADMIN',
     },
     select: { usuarioId: true },
   });
