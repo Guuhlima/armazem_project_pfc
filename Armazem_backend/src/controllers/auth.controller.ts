@@ -19,7 +19,6 @@ type Body = Static<typeof UsuarioBodySchema>;
 type Params = Static<typeof UsuarioParamsSchema>;
 type LoginBody = Static<typeof UsuarioLoginSchema>;
 
-/** Helpers de cookie (mantenha em um lugar central se preferir) */
 const isProd = process.env.NODE_ENV === 'production';
 
 const cookieOpts = {
@@ -68,7 +67,6 @@ export async function login(
       return reply.code(401).send({ error: 'credenciais inválidas' });
     }
 
-    // garante roles no Redis para RBAC
     await syncUserRolesToRedis(req.server, user.id);
 
     const tokens = await issueTokens(req.server, {
@@ -94,7 +92,6 @@ export async function refreshToken(
   reply: FastifyReply
 ) {
   try {
-    // Aceita do body ou do cookie
     const bodyToken = req.body?.refreshToken;
     const cookieToken = (req.cookies as any)?.refreshToken as string | undefined;
     const refreshToken = bodyToken ?? cookieToken;
@@ -126,7 +123,6 @@ export async function logout(
   reply: FastifyReply
 ) {
   try {
-    // Tenta revogar a sessão do refresh atual (se presente)
     const bodyToken = req.body?.refreshToken;
     const cookieToken = (req.cookies as any)?.refreshToken as string | undefined;
     const refreshToken = bodyToken ?? cookieToken;
@@ -136,18 +132,15 @@ export async function logout(
         const payload = req.server.jwt.verify<{ sub: number; jti: string }>(refreshToken);
         await revokeSession(req.server, payload.jti, payload.sub);
       } catch (e) {
-        // token inválido/expirado — segue a limpeza mesmo assim
         req.server.log.info({ e }, 'logout: refresh inválido, prosseguindo limpeza');
       }
     }
 
-    // Limpa cookies sempre
     clearAuthCookies(reply);
 
     return reply.send({ ok: true });
   } catch (err) {
     req.server.log.error({ err }, 'logout error');
-    // Mesmo em erro, tente limpar cookies para não deixar sessão presa no cliente
     clearAuthCookies(reply);
     return reply.send({ ok: true });
   }

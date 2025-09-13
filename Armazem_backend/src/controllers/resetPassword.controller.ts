@@ -3,7 +3,6 @@ import { prisma } from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import { generateToken, sha256, sendEmail } from '../lib/resetPassword';
 
-
 export async function solicitarResetSenha(
   req: FastifyRequest<{ Body: { email: string } }>,
   reply: FastifyReply

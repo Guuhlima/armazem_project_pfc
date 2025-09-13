@@ -1,4 +1,3 @@
-// src/lib/rbac-sync.ts
 import { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 const prisma = new PrismaClient();
@@ -12,7 +11,7 @@ export async function syncUserRolesToRedis(app: FastifyInstance, userId: number)
   });
 
   const pipe = app.redis.pipeline();
-  pipe.del(userRolesKey(userId)); // zera para evitar sujeira antiga
+  pipe.del(userRolesKey(userId));
   for (const r of rows) {
     pipe.sadd(userRolesKey(userId), r.role.nome);
   }

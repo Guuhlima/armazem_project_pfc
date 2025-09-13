@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 type Body = Static<typeof EstoqueBodySchema>;
 type Params = Static<typeof EstoqueParamsSchema>;
 
+// === CADASTAR UM NOVO ESTOQUE ========
 export async function cadastrarEstoque(req: FastifyRequest<{ Body: Body }>, reply: FastifyReply) {
     try {
         const { nome } = req.body;
@@ -17,6 +18,7 @@ export async function cadastrarEstoque(req: FastifyRequest<{ Body: Body }>, repl
     }
 }
 
+// === VISUALIZAR UM ESTOQUE =====
 export async function visualizarEstoque(_: FastifyRequest, reply: FastifyReply) {
     try {
         const estoques = await prisma.estoque.findMany();
@@ -27,6 +29,7 @@ export async function visualizarEstoque(_: FastifyRequest, reply: FastifyReply) 
     }
 }
 
+// === VISUALIZAR ESTOQUE POR ID ====
 export async function visualizarEstoquePorId(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
     try {
         const { id } = req.params;
@@ -43,6 +46,7 @@ export async function visualizarEstoquePorId(req: FastifyRequest<{ Params: Param
     }
 }
 
+// === EDITAR UM ESTOQUE =======
 export async function editarEstoque(req: FastifyRequest<{ Body: Body, Params: Params }>, reply: FastifyReply) {
     try {
         const { id } = req.params;
@@ -60,6 +64,7 @@ export async function editarEstoque(req: FastifyRequest<{ Body: Body, Params: Pa
     }
 }
 
+// === DELETAR UM ESTQOUE ====
 export async function deletarEstoque(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
     try {
         const { id } = req.params;
@@ -79,6 +84,7 @@ export async function deletarEstoque(req: FastifyRequest<{ Params: Params }>, re
     }
 }
 
+// === VISUALIZAR ITENS POR ESTOQUES SEPARADOS ====
 export async function visualizarItensPorEstoque(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
     try {
         const { id } = req.params;
@@ -103,6 +109,7 @@ export async function visualizarItensPorEstoque(req: FastifyRequest<{ Params: Pa
     }
 }
 
+// === VISUALIZAR MUES ESTOQUES =====
 export async function meusEstoques(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);
@@ -166,7 +173,7 @@ export async function desvincularMeDoEstoque(
 
     await prisma.usuarioEstoque.delete({
       where: { usuarioId_estoqueId: { usuarioId: userId, estoqueId } },
-    }).catch(() => { /* idempotente: se não existe, ok */ });
+    }).catch(() => { });
 
     return reply.send({ ok: true, message: 'Desvinculado com sucesso' });
   } catch (err) {
@@ -215,7 +222,9 @@ export async function desvincularUsuarioDoEstoque(
 
     await prisma.usuarioEstoque.delete({
       where: { usuarioId_estoqueId: { usuarioId, estoqueId } },
-    }).catch(() => { /* idempotente */ });
+    }).catch(() => {
+      return reply.code(500).send({ error: 'Erro ao deletar usuario do estoque'})
+     });
 
     return reply.send({ ok: true, message: 'Vínculo removido', usuarioId, estoqueId });
   } catch (err) {
@@ -232,7 +241,7 @@ export async function listarEstoquesDisponiveis(req: FastifyRequest, reply: Fast
     if (!userId) return reply.code(401).send({ error: 'não autenticado' });
 
     const estoques = await prisma.estoque.findMany({
-      where: { usuarios: { none: { usuarioId: userId } } }, // relation UsuarioEstoque em Estoque
+      where: { usuarios: { none: { usuarioId: userId } } },
       select: { id: true, nome: true },
       orderBy: { nome: 'asc' },
     });
@@ -272,14 +281,11 @@ export async function solicitarAcessoAoEstoque(
       data: { usuarioId: userId, estoqueId, reason },
     });
 
-    // 🔔 DESTINATÁRIOS DAS NOTIFICAÇÕES
-    // a) SUPER-ADMIN (via UsuarioRole -> Role.nome)
     const superAdmins = await prisma.usuario.findMany({
       where: { roles: { some: { role: { nome: 'SUPER-ADMIN' } } } },
       select: { id: true },
     });
 
-    // b) (opcional) Admins do próprio estoque
     const stockAdmins = await prisma.usuarioEstoque.findMany({
       where: { estoqueId, role: 'ADMIN' },
       select: { usuarioId: true },

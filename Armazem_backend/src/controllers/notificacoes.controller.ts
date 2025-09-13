@@ -1,12 +1,11 @@
 // src/controllers/notifications.controller.ts
 import { FastifyReply, FastifyRequest, RouteHandler } from 'fastify'
 import { prisma } from '../lib/prisma'
-import { TelegramService } from '../service/telegram.service' // <-- ajuste do caminho
+import { TelegramService } from '../service/telegram.service'
 
 type EstoqueOnly = { estoqueId: string }
 type UpsertBody = { chatId?: string }
 
-// ====== Notificações gerais (já existiam) ======
 export async function listNotifications(
   req: FastifyRequest,
   reply: FastifyReply

@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { Static, Type } from '@sinclair/typebox';
-import { EstoqueItemBodySchema, EstoqueItemParamsSchema} from '../schemas/stockItens.schema';
+import { EstoqueItemBodySchema } from '../schemas/stockItens.schema';
 
 type Body = Static<typeof EstoqueItemBodySchema>;
 

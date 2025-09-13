@@ -29,6 +29,7 @@ model Usuario {
   estoques           UsuarioEstoque[]
   passwordResetToken PasswordResetToken[]
   notificacoes       Notificacao[]
+  transfrencias      Transferencia[]
   
   estoqueTelegramNotify EstoqueTelegramNotify[]
   accessRequests   StockAccessRequest[] @relation("RequestOwner")
@@ -129,11 +130,16 @@ model Transferencia {
   quantidade        Int
   dataTransferencia DateTime? @default(now()) @db.Timestamp(6)
 
+  // opcional por enquanto
+  usuarioId         Int?
+  usuario           Usuario?  @relation(fields: [usuarioId], references: [id])
+
   item    Equipamento @relation(fields: [itemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   origem  Estoque     @relation("TransferenciasOrigem", fields: [estoqueOrigemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   destino Estoque     @relation("TransferenciasDestino", fields: [estoqueDestinoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("transferencias")
+  @@index([usuarioId])
 }
 
 model EstoqueItem {

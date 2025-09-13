@@ -54,11 +54,9 @@ const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
       return async (req: FastifyRequest) => {
         const uid = (req.user as any)?.id;
 
-        // 1) Fallback rápido: permissões no token
         const permsFromToken: string[] = (req.user as any)?.permissoes || [];
         if (permsFromToken.includes(perm)) return;
 
-        // 2) Fluxo padrão via Redis
         if (uid == null) {
           throw fastify.httpErrors.unauthorized('unauthorized');
         }

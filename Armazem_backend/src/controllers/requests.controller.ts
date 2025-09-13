@@ -1,9 +1,7 @@
-// src/controllers/requests.controller.ts
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { syncUserRolesToRedis } from '../lib/rbac-sync';
 
-/** Helpers */
 async function isSuperAdmin(userId: number) {
   const u = await prisma.usuario.findFirst({
     where: { id: userId, roles: { some: { role: { nome: 'SUPER-ADMIN' } } } },
@@ -19,7 +17,6 @@ async function isStockAdmin(userId: number, estoqueId: number) {
   return v?.role === 'ADMIN';
 }
 
-/** GET /requests?status=PENDING|APPROVED|REJECTED */
 export async function listRequests(req: FastifyRequest, reply: FastifyReply) {
   try {
     const status = (req.query as any)?.status as 'PENDING'|'APPROVED'|'REJECTED'|undefined;
@@ -37,7 +34,6 @@ export async function listRequests(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
-/** GET /requests/:id */
 export async function getRequestById(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
   try {
     const id = Number(req.params.id);
@@ -53,7 +49,6 @@ export async function getRequestById(req: FastifyRequest<{ Params: { id: string 
   }
 }
 
-/** POST /requests/:id/approve */
 export async function approveRequest(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -76,14 +71,12 @@ export async function approveRequest(
     if (!superA && !stockA) return reply.code(403).send({ error: 'Sem permissão para aprovar' });
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1) Vincula usuário ao estoque como MEMBER
       await tx.usuarioEstoque.upsert({
         where: { usuarioId_estoqueId: { usuarioId: item.usuarioId, estoqueId: item.estoqueId } },
         update: { role: 'MEMBER' },
         create: { usuarioId: item.usuarioId, estoqueId: item.estoqueId, role: 'MEMBER' },
       });
 
-      // 2) Garante role global USER-EQUIPAMENTOS (e remove 'usuarioPadrão' se existir)
       const [roleUsuarioPadrao, roleUserEquip] = await Promise.all([
         tx.role.findUnique({ where: { nome: 'usuarioPadrão' } }),
         tx.role.findUnique({ where: { nome: 'USER-EQUIPAMENTOS' } }),
@@ -101,13 +94,11 @@ export async function approveRequest(
         create: { usuarioId: item.usuarioId, roleId: roleUserEquip.id },
       });
 
-      // 3) Atualiza a solicitação
       const updatedReq = await tx.stockAccessRequest.update({
         where: { id },
         data: { status: 'APPROVED', approverId, decidedAt: new Date() },
       });
 
-      // 4) Notifica solicitante (best-effort dentro da tx mesmo)
       await tx.notificacao.create({
         data: {
           userId: item.usuarioId,
@@ -116,12 +107,13 @@ export async function approveRequest(
           message: `Seu acesso ao armazém ${item.estoqueId} foi aprovado.`,
           refId: id,
         },
-      }).catch(() => { /* não falha a tx por notificação */ });
+      }).catch(() => {
+        return reply.code(500).send({ error: 'Erro ao notificar aprovação'})
+       });
 
       return { updatedReq, usuarioId: item.usuarioId };
     });
 
-    // 5) Atualiza RBAC no Redis para refletir permissões imediatamente
     await syncUserRolesToRedis(req.server, result.usuarioId);
 
     return reply.send({ ok: true, request: result.updatedReq });
@@ -131,7 +123,6 @@ export async function approveRequest(
   }
 }
 
-/** POST /requests/:id/reject */
 export async function rejectRequest(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
   try {
     const approverId = Number((req.user as any)?.id);
@@ -155,7 +146,6 @@ export async function rejectRequest(req: FastifyRequest<{ Params: { id: string }
       data: { status: 'REJECTED', approverId, decidedAt: new Date() },
     });
 
-    // Notifica solicitante (fora da tx é ok também)
     await prisma.notificacao.create({
       data: {
         userId: item.usuarioId,

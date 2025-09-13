@@ -11,6 +11,7 @@ import {
 type Body = Static<typeof UsuarioBodySchema>;
 type Params = Static<typeof UsuarioParamsSchema>;
 
+// Cadastrar novos usuarios
 export async function cadastrarUsuarios(
   req: FastifyRequest<{ Body: Body }>,
   reply: FastifyReply
@@ -21,7 +22,6 @@ export async function cadastrarUsuarios(
     const emailNorm = email?.trim().toLowerCase();
 
     const usuario = await prisma.$transaction(async (tx) => {
-      // RBAC novo: role padrão
       const rolePadrao = await tx.role.upsert({
         where: { nome: 'usuarioPadrão' },
         create: { nome: 'usuarioPadrão' },
@@ -58,6 +58,7 @@ export async function cadastrarUsuarios(
   }
 }
 
+// Visualizar Usuarios geral
 export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyReply) {
   try {
     const requesterId = Number((req.user as any)?.id);
@@ -145,6 +146,7 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
   }
 }
 
+// Visualizar usuario por id
 export async function visualizarUsuariosPorId(
   req: FastifyRequest<{ Params: Params }>,
   reply: FastifyReply
@@ -160,6 +162,7 @@ export async function visualizarUsuariosPorId(
   }
 }
 
+// Editar usuario
 export async function editarUsuarios(
   req: FastifyRequest<{ Body: Body; Params: Params }>,
   reply: FastifyReply
@@ -183,6 +186,7 @@ export async function editarUsuarios(
   }
 }
 
+// Deletar usuarios
 export async function deletarUsuarios(
   req: FastifyRequest<{ Params: Params }>,
   reply: FastifyReply

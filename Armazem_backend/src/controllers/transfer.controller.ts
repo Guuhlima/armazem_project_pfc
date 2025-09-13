@@ -15,50 +15,52 @@ export async function realizarTransferencia(
 ) {
   try {
     const { itemId, estoqueOrigemId, estoqueDestinoId, quantidade } = req.body;
+    const usuarioId = Number((req.user as any)?.id);
 
-    const itemOrigem = await prisma.estoqueItem.findFirst({
-      where: { itemId, estoqueId: estoqueOrigemId },
-    });
-
-    if (!itemOrigem || itemOrigem.quantidade < quantidade) {
-      return reply.status(400).send({ error: 'Quantidade insuficiente no estoque de origem' });
+    if (!usuarioId) {
+      return reply.status(401).send({ error: 'Não autenticado' });
+    }
+    if (estoqueOrigemId === estoqueDestinoId) {
+      return reply.status(400).send({ error: 'Estoques de origem e destino devem ser diferentes' });
+    }
+    if (quantidade <= 0) {
+      return reply.status(400).send({ error: 'Quantidade deve ser maior que zero' });
     }
 
-    await prisma.estoqueItem.update({
-      where: { id: itemOrigem.id },
-      data: { quantidade: { decrement: quantidade } },
-    });
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.estoqueItem.updateMany({
+        where: { itemId, estoqueId: estoqueOrigemId, quantidade: { gte: quantidade } },
+        data: { quantidade: { decrement: quantidade } },
+      });
 
-    await prisma.estoqueItem.upsert({
-      where: {
-        itemId_estoqueId: {
+      if (updated.count === 0) {
+        throw new Error('Quantidade insuficiente no estoque de origem');
+      }
+
+      await tx.estoqueItem.upsert({
+        where: { itemId_estoqueId: { itemId, estoqueId: estoqueDestinoId } },
+        update: { quantidade: { increment: quantidade } },
+        create: { itemId, estoqueId: estoqueDestinoId, quantidade },
+      });
+
+      await tx.transferencia.create({
+        data: {
           itemId,
-          estoqueId: estoqueDestinoId,
+          estoqueOrigemId,
+          estoqueDestinoId,
+          quantidade,
+          usuarioId, 
         },
-      },
-      update: {
-        quantidade: { increment: quantidade },
-      },
-      create: {
-        itemId,
-        estoqueId: estoqueDestinoId,
-        quantidade,
-      },
-    });
+      });
+    }, { isolationLevel: 'Serializable' });
 
-    await prisma.transferencia.create({
-      data: {
-        itemId,
-        estoqueOrigemId,
-        estoqueDestinoId,
-        quantidade,
-      },
-    });
-
-    reply.send({ message: 'Transferência realizada com sucesso' });
+    return reply.send({ ok: true, message: 'Transferência realizada com sucesso' });
   } catch (error: any) {
-    reply.status(500).send({ error: 'Erro ao realizar transferência' });
     console.error(error);
+    if (error.message?.includes('insuficiente')) {
+      return reply.status(400).send({ error: error.message });
+    }
+    return reply.status(500).send({ error: 'Erro ao realizar transferência' });
   }
 }
 
