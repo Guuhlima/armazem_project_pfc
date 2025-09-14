@@ -80,5 +80,4 @@ const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
   done();
 };
 
-
 export default fp(rbacPlugin, { name: "rbac-plugin" });

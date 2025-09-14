@@ -18,6 +18,14 @@ enum AccessStatus {
   REJECTED
 }
 
+enum AgendamentoStatus {
+  PENDING
+  SENT
+  EXECUTED
+  CANCELED
+  FAILED
+}
+
 model Usuario {
   id        Int     @id @default(autoincrement())
   nome      String? @db.VarChar(255)
@@ -29,22 +37,24 @@ model Usuario {
   estoques           UsuarioEstoque[]
   passwordResetToken PasswordResetToken[]
   notificacoes       Notificacao[]
-  transfrencias      Transferencia[]
-  
+  agendamentos       TransferenciaAgendada[]
+  transferencias     Transferencia[]
+
   estoqueTelegramNotify EstoqueTelegramNotify[]
-  accessRequests   StockAccessRequest[] @relation("RequestOwner")
-  approvedRequests StockAccessRequest[] @relation("StockRequestApprover")
+  accessRequests        StockAccessRequest[]    @relation("RequestOwner")
+  approvedRequests      StockAccessRequest[]    @relation("StockRequestApprover")
 
   @@map("usuarios")
 }
 
 model Equipamento {
-  id             Int             @id @default(autoincrement())
-  nome           String?         @map("equipamento") @db.VarChar(255)
+  id             Int                     @id @default(autoincrement())
+  nome           String?                 @map("equipamento") @db.VarChar(255)
   quantidade     Int?
-  data           DateTime?       @db.Date
+  data           DateTime?               @db.Date
   transferencias Transferencia[]
   estoqueItens   EstoqueItem[]
+  agendamentos   TransferenciaAgendada[]
 
   @@map("equipamentos")
 }
@@ -73,9 +83,12 @@ model Estoque {
   transferenciasOrigem  Transferencia[] @relation("TransferenciasOrigem")
   itens                 EstoqueItem[]
 
-  usuarios UsuarioEstoque[]
+  agendamentosOrigem  TransferenciaAgendada[] @relation("AgendamentoOrigem") // ← novo
+  agendamentosDestino TransferenciaAgendada[] @relation("AgendamentoDestino") // ← novo
+
+  usuarios              UsuarioEstoque[]
   estoqueTelegramNotify EstoqueTelegramNotify[]
-  requests StockAccessRequest[]
+  requests              StockAccessRequest[]
 
   @@map("estoques")
 }
@@ -93,16 +106,16 @@ model UsuarioEstoque {
 }
 
 model Notificacao {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    Int
   type      String
   title     String
   message   String
   refId     Int?
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  usuario   Usuario  @relation(fields: [userId], references: [id])
+  usuario Usuario @relation(fields: [userId], references: [id])
 }
 
 model StockAccessRequest {
@@ -128,18 +141,18 @@ model Transferencia {
   estoqueOrigemId   Int
   estoqueDestinoId  Int
   quantidade        Int
-  dataTransferencia DateTime? @default(now()) @db.Timestamp(6)
+  dataTransferencia DateTime? @default(now()) @db.Timestamptz(6)
 
-  // opcional por enquanto
-  usuarioId         Int?
-  usuario           Usuario?  @relation(fields: [usuarioId], references: [id])
+  usuarioId   Int?
+  usuario     Usuario?               @relation(fields: [usuarioId], references: [id])
+  agendamento TransferenciaAgendada?
 
   item    Equipamento @relation(fields: [itemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   origem  Estoque     @relation("TransferenciasOrigem", fields: [estoqueOrigemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   destino Estoque     @relation("TransferenciasDestino", fields: [estoqueDestinoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@map("transferencias")
   @@index([usuarioId])
+  @@map("transferencias")
 }
 
 model EstoqueItem {
@@ -217,17 +230,46 @@ model PermissaoOnRoute {
 }
 
 model EstoqueTelegramNotify {
-  id         Int      @id @default(autoincrement())
-  usuarioId  Int?
-  estoqueId  Int
-  chatId     String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  usuarioId Int?
+  estoqueId Int
+  chatId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  usuario    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  estoque    Estoque  @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+  usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  estoque Estoque  @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
 
   @@unique([usuarioId, estoqueId], name: "usuario_estoque_unique")
   @@index([estoqueId])
 }
 
+model TransferenciaAgendada {
+  id               Int      @id @default(autoincrement())
+  itemId           Int
+  estoqueOrigemId  Int
+  estoqueDestinoId Int
+  quantidade       Int
+  usuarioId        Int
+  executarEm       DateTime @db.Timestamptz(6) // recomendado
+
+  status              AgendamentoStatus @default(PENDING)
+  tentativas          Int               @default(0)
+  erroUltimaTentativa String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transferenciaId Int?           @unique
+  transferencia   Transferencia? @relation(fields: [transferenciaId], references: [id])
+
+  item    Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  origem  Estoque     @relation("AgendamentoOrigem", fields: [estoqueOrigemId], references: [id], onDelete: Restrict)
+  destino Estoque     @relation("AgendamentoDestino", fields: [estoqueDestinoId], references: [id], onDelete: Restrict)
+  usuario Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([status, executarEm])
+  @@index([usuarioId])
+  @@index([itemId, estoqueOrigemId, estoqueDestinoId])
+  @@map("transferencias_agendadas")
+}

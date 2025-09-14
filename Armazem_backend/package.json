@@ -46,6 +46,7 @@
     "zod": "^4.0.15"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/babel__core": "^7.20.5",
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
