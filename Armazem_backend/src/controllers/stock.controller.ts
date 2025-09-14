@@ -134,7 +134,7 @@ export async function meusEstoques(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
-// === VINCULAR/ DESVINCULAR (usuário logado) ================================
+// ABAIXO CONTROLLERS PARA SOLICITAR VINCULO AO ESTOQUE E DESVINCULAR USUARIO
 
 export async function vincularMeAoEstoque(
   req: FastifyRequest<{ Params: { id: string } }>,
@@ -182,7 +182,6 @@ export async function desvincularMeDoEstoque(
   }
 }
 
-// === ADMIN: VINCULAR/ DESVINCULAR QUALQUER USUÁRIO =========================
 
 export async function vincularUsuarioAoEstoque(
   req: FastifyRequest<{ Params: { userId: string; estoqueId: string } }>,
@@ -233,7 +232,6 @@ export async function desvincularUsuarioDoEstoque(
   }
 }
 
-// === VALIDAÇÕES DE SOLICITAR ACESSO ===
 
 export async function listarEstoquesDisponiveis(req: FastifyRequest, reply: FastifyReply) {
   try {
