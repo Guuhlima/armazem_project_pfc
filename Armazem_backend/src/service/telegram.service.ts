@@ -1,11 +1,9 @@
-// src/services/telegram.service.ts
 import TelegramBot from 'node-telegram-bot-api';
 import { prisma } from '../lib/prisma';
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 export const bot = new TelegramBot(token, { polling: true });
 
-// Apenas informa o chat_id
 bot.onText(/^\/chatid$/, async (msg) => {
   const chatId = String(msg.chat.id);
   const esc = (s: string) =>
@@ -18,7 +16,6 @@ bot.onText(/^\/chatid$/, async (msg) => {
   );
 });
 
-// ===== Helpers internos =====
 // busca todos os chatIds dos usuários que OPTARAM por receber no estoque X
 async function getDestinatariosPorEstoque(estoqueId: number): Promise<string[]> {
   const rows = await prisma.estoqueTelegramNotify.findMany({
@@ -37,7 +34,6 @@ export const TelegramService = {
       const desc  = e?.response?.body?.description ?? e?.message;
       console.error('Telegram sendMessage failed', { chatId, code, desc });
 
-      // se o usuário bloqueou o bot, limpamos esse chatId do banco
       if (code === 403 || String(desc || '').includes('bot was blocked by the user')) {
         await prisma.estoqueTelegramNotify.deleteMany({ where: { chatId } }).catch(() => {});
       }
@@ -65,14 +61,14 @@ export const TelegramService = {
     }).format(t.quando);
 
     const text =
-`📦 *Nova transferência de equipamento*
-*Item:* ${t.itemNome}
-*Quantidade:* ${t.quantidade}
-*De:* #${t.estoqueOrigemId} → *Para:* #${t.estoqueDestinoId}
-*Por:* ${t.usuario}
-*ID:* ${t.transferenciaId}
-*Quando:* ${quandoFmt}
-`;
+      `📦 *Nova transferência de equipamento*
+      *Item:* ${t.itemNome}
+      *Quantidade:* ${t.quantidade}
+      *De:* #${t.estoqueOrigemId} → *Para:* #${t.estoqueDestinoId}
+      *Por:* ${t.usuario}
+      *ID:* ${t.transferenciaId}
+      *Quando:* ${quandoFmt}
+    `;
     await Promise.all(dests.map(id => this.safeSendRaw(id, text)));
   },
 
@@ -92,11 +88,11 @@ export const TelegramService = {
     }).format(s.quando);
 
     const text =
-`🔐 *Nova solicitação de acesso ao estoque #${s.estoqueId}*
-*Solicitante:* ${s.solicitante}
-${s.motivo ? `*Motivo:* ${s.motivo}\n` : ''}*ID:* ${s.solicitacaoId}
-*Quando:* ${quandoFmt}
-`;
+      `🔐 *Nova solicitação de acesso ao estoque #${s.estoqueId}*
+      *Solicitante:* ${s.solicitante}
+      ${s.motivo ? `*Motivo:* ${s.motivo}\n` : ''}*ID:* ${s.solicitacaoId}
+      *Quando:* ${quandoFmt}
+    `;
     await Promise.all(dests.map(id => this.safeSendRaw(id, text)));
   },
 };

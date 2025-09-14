@@ -91,6 +91,9 @@ export async function markAllRead(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// ABAIXO CONTROLLERS PARA VALIDAÇÃO DA FEATURE DE NOTIFICAÇÃO TELEGRAM
+
+
 export const getTelegramNotifyForMe: RouteHandler<{ Params: EstoqueOnly }> = async (req, reply) => {
   const usuarioId = Number((req.user as any)?.id)
   const estoqueId = Number(req.params.estoqueId)

@@ -1,9 +1,7 @@
-// src/services/notification.service.ts
 import { prisma } from '../lib/prisma';
 import { TelegramService } from './telegram.service';
 
 export const NotificationService = {
-  // Notificação genérica (in-app)
   async notifyUserInApp(userId: number, data: {
     type: string;
     title: string;
@@ -31,7 +29,6 @@ export const NotificationService = {
   }) {
     const adminUserIds = await resolveEstoqueAdmins(estoqueId);
 
-    // 1) IN-APP
     if (adminUserIds.length) {
       await prisma.$transaction(
         adminUserIds.map((uid) =>
@@ -89,7 +86,6 @@ export const NotificationService = {
       `;
 
     await Promise.all([
-      // Aviso para admins do estoque de origem
       this.notifyEstoqueAdmins(t.estoqueOrigemId, {
         type: 'transfer',
         title: 'Nova transferência enviada',
@@ -97,7 +93,7 @@ export const NotificationService = {
         refId: t.transferenciaId,
         telegramText,
       }),
-      // Aviso para admins do estoque de destino
+
       this.notifyEstoqueAdmins(t.estoqueDestinoId, {
         type: 'transfer',
         title: 'Nova transferência recebida',
@@ -108,7 +104,6 @@ export const NotificationService = {
     ]);
   },
 
-  // Caso específico: solicitação de acesso
   async notifySolicitacaoAcesso(params: {
     estoqueId: number;
     solicitante: string;
@@ -142,7 +137,6 @@ export const NotificationService = {
   },
 };
 
-// Admins do estoque: pega usuários com role ADMIN na tabela de junção
 async function resolveEstoqueAdmins(estoqueId: number): Promise<number[]> {
   const admins = await prisma.usuarioEstoque.findMany({
     where: {
@@ -154,7 +148,6 @@ async function resolveEstoqueAdmins(estoqueId: number): Promise<number[]> {
   return admins.map(a => a.usuarioId);
 }
 
-// Chat IDs configurados para o estoque
 async function getEstoqueChatIds(estoqueId: number): Promise<string[]> {
   const rows = await prisma.estoqueTelegramNotify.findMany({
     where: { estoqueId },
