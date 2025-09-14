@@ -17,3 +17,10 @@ declare module 'amqplib' {
   const _default: { connect(url: string): Promise<Connection> };
   export default _default;
 }
+
+
+export interface ConsumeMessage {
+  content: Buffer;
+  fields: any;
+  properties: any;
+}

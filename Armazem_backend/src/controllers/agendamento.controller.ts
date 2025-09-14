@@ -5,6 +5,15 @@ import {
   AgendamentoParamsType,
 } from '../schemas/agendamento.schema';
 
+function formatBr(dt: Date) {
+  const s = dt.toLocaleString('sv-SE', { 
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).replace(' ', 'T');
+  return s + '-03:00';
+}
+
 export async function createAgendamento(
   req: FastifyRequest<{ Body: AgendamentoCreateBodyType }>,
   reply: FastifyReply

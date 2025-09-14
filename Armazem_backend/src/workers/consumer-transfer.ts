@@ -1,7 +1,8 @@
 import { getChannel } from '../queue/rabbit';
 import { prisma } from '../lib/prisma';
 import { ensureRetryQueue, nextDelayMs } from '../queue/retry';
-import type { ConsumeMessage } from 'amqplib';
+
+type ConsumeMessage = import('amqplib').ConsumeMessage;
 
 const MAX_ATTEMPTS = 5;
 
