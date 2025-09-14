@@ -9,6 +9,8 @@ import { prisma } from '../lib/prisma';
 type Body = Static<typeof TransferenciaBodySchema>;
 type Params = Static<typeof TransferenciaParamsSchema>;
 
+// ABAIXO FEATURE DE REALIZAR TRANSFERENCIA ENTRE ESTOQUES DEBITANDO DE UM ESTOQUE E ACRESCENTANDO O VALOR EM OUTRO JUNTO COM O EQUIPAMENTO 
+
 export async function realizarTransferencia(
   req: FastifyRequest<{ Body: Body }>,
   reply: FastifyReply
