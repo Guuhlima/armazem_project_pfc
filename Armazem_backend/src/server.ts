@@ -22,6 +22,7 @@ import { notificationsRoutes } from "./routes/notificacoes.routes";
 import { requestsRoutes } from "./routes/requests.routes";
 import { adminUserStockRoutes } from "./routes/adminUserStock.routes";
 import { agendamentoRoutes } from "./routes/agendamento.routes";
+import { movimentacoesRoutes } from "routes/movimentacoes.routes";
 
 import { startSchedulerLoop } from "./workers/scheduler";
 import { startConsumer } from "./workers/consumer-transfer";
@@ -120,6 +121,11 @@ async function bootstrap() {
     r.addHook("onRequest", r.authenticate);
     r.register(adminUserStockRoutes);
   });
+
+  await app.register(async (r) => {
+    r.addHook("onRequest", r.authenticate);
+    r.register(movimentacoesRoutes);
+  })
 
   await app.register(agendamentoRoutes);
 
