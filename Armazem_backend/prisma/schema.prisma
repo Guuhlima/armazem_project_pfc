@@ -217,7 +217,7 @@ model Route {
   path       String
   permissoes PermissaoOnRoute[]
   createdAt  DateTime           @default(now())
-  // @@map("routes") se sua tabela tiver nome diferente
+  // @@map("routes")
 }
 
 model PermissaoOnRoute {
@@ -251,7 +251,7 @@ model TransferenciaAgendada {
   estoqueDestinoId Int
   quantidade       Int
   usuarioId        Int
-  executarEm       DateTime @db.Timestamptz(6) // recomendado
+  executarEm       DateTime @db.Timestamptz(6)
 
   status              AgendamentoStatus @default(PENDING)
   tentativas          Int               @default(0)
@@ -272,4 +272,14 @@ model TransferenciaAgendada {
   @@index([usuarioId])
   @@index([itemId, estoqueOrigemId, estoqueDestinoId])
   @@map("transferencias_agendadas")
+}
+
+model MovimentacaoEstoque {
+  id           Int      @id @default(autoincrement())
+  itemId       Int
+  estoqueId    Int
+  tipo         String
+  quantidade   Int
+  referenciaId Int?
+  createdAt    DateTime @default(now())
 }
