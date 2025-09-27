@@ -4,12 +4,12 @@ import { MovQueryType } from '../schemas/movimentacoes.schema';
 
 type LinhaAgg = {
   itemId: number;
+  itemNome: string;
   estoqueId: number;
+  estoqueNome: string;
   bucket: string;
   entradas: number;
   saidas: number;
-  real: number;
-  projetado: number;
   tipos: string[];
 };
 
@@ -47,14 +47,12 @@ export async function relatorioMovimentacoesController(
     const item = itemId ? Number(itemId) : undefined;
     const est  = estoqueId ? Number(estoqueId) : undefined;
 
-    const whereTransfPeriodo: any = {
-      ...(item ? { itemId: item } : {}),
-      ...(est ? { OR: [{ estoqueOrigemId: est }, { estoqueDestinoId: est }] } : {}),
-      dataTransferencia: { gte: inicio, lte: fim },
-    };
-
     const transferencias = await prisma.transferencia.findMany({
-      where: whereTransfPeriodo,
+      where: {
+        ...(item ? { itemId: item } : {}),
+        ...(est ? { OR: [{ estoqueOrigemId: est }, { estoqueDestinoId: est }] } : {}),
+        dataTransferencia: { gte: inicio, lte: fim },
+      },
       select: {
         itemId: true,
         estoqueOrigemId: true,
@@ -63,18 +61,6 @@ export async function relatorioMovimentacoesController(
         dataTransferencia: true,
       }
     });
-
-    type Mov = { itemId:number; estoqueId:number; ts:Date; qtd:number; tipo:'TRANSFER_OUT'|'TRANSFER_IN' };
-    const movReais: Mov[] = [];
-    for (const t of transferencias) {
-      const ts: Date = t.dataTransferencia ?? new Date();
-      if (!est || est === t.estoqueOrigemId) {
-        movReais.push({ itemId: t.itemId, estoqueId: t.estoqueOrigemId, ts, qtd: -t.quantidade, tipo: 'TRANSFER_OUT' });
-      }
-      if (!est || est === t.estoqueDestinoId) {
-        movReais.push({ itemId: t.itemId, estoqueId: t.estoqueDestinoId, ts, qtd: +t.quantidade, tipo: 'TRANSFER_IN' });
-      }
-    }
 
     const agendadas = await prisma.transferenciaAgendada.findMany({
       where: {
@@ -92,90 +78,126 @@ export async function relatorioMovimentacoesController(
       }
     });
 
-    type MovProj = { itemId:number; estoqueId:number; ts:Date; qtd:number; tipo:'SCHEDULED_OUT'|'SCHEDULED_IN' };
+    const itemIds = new Set<number>();
+    const estoqueIds = new Set<number>();
+    for (const t of transferencias) {
+      itemIds.add(t.itemId);
+      estoqueIds.add(t.estoqueOrigemId);
+      estoqueIds.add(t.estoqueDestinoId);
+    }
+    for (const a of agendadas) {
+      itemIds.add(a.itemId);
+      estoqueIds.add(a.estoqueOrigemId);
+      estoqueIds.add(a.estoqueDestinoId);
+    }
+
+    const [itens, estoques] = await Promise.all([
+      prisma.equipamento.findMany({ where: { id: { in: Array.from(itemIds) } }, select: { id: true, nome: true } }),
+      prisma.estoque.findMany({ where: { id: { in: Array.from(estoqueIds) } }, select: { id: true, nome: true } }),
+    ]);
+
+    const itemNomeById = new Map(itens.map(i => [i.id, i.nome ?? `#${i.id}`]));
+    const estoqueNomeById = new Map(estoques.map(e => [e.id, e.nome ?? `#${e.id}`]));
+
+    type Mov = {
+      itemId:number; itemNome:string;
+      estoqueId:number; estoqueNome:string;
+      ts:Date; qtd:number;
+      tipo:'TRANSFER_OUT'|'TRANSFER_IN';
+    };
+    const movReais: Mov[] = [];
+    for (const t of transferencias) {
+      const ts: Date = t.dataTransferencia ?? new Date();
+      if (!est || est === t.estoqueOrigemId) {
+        movReais.push({
+          itemId: t.itemId,
+          itemNome: itemNomeById.get(t.itemId) ?? `#${t.itemId}`,
+          estoqueId: t.estoqueOrigemId,
+          estoqueNome: estoqueNomeById.get(t.estoqueOrigemId) ?? `#${t.estoqueOrigemId}`,
+          ts, qtd: -t.quantidade, tipo: 'TRANSFER_OUT'
+        });
+      }
+      if (!est || est === t.estoqueDestinoId) {
+        movReais.push({
+          itemId: t.itemId,
+          itemNome: itemNomeById.get(t.itemId) ?? `#${t.itemId}`,
+          estoqueId: t.estoqueDestinoId,
+          estoqueNome: estoqueNomeById.get(t.estoqueDestinoId) ?? `#${t.estoqueDestinoId}`,
+          ts, qtd: +t.quantidade, tipo: 'TRANSFER_IN'
+        });
+      }
+    }
+
+    type MovProj = {
+      itemId:number; itemNome:string;
+      estoqueId:number; estoqueNome:string;
+      ts:Date; qtd:number;
+      tipo:'SCHEDULED_OUT'|'SCHEDULED_IN';
+    };
     const movProj: MovProj[] = [];
     for (const a of agendadas) {
       const ts = a.executarEm;
       if (!est || est === a.estoqueOrigemId) {
-        movProj.push({ itemId: a.itemId, estoqueId: a.estoqueOrigemId, ts, qtd: -a.quantidade, tipo: 'SCHEDULED_OUT' });
+        movProj.push({
+          itemId: a.itemId,
+          itemNome: itemNomeById.get(a.itemId) ?? `#${a.itemId}`,
+          estoqueId: a.estoqueOrigemId,
+          estoqueNome: estoqueNomeById.get(a.estoqueOrigemId) ?? `#${a.estoqueOrigemId}`,
+          ts, qtd: -a.quantidade, tipo: 'SCHEDULED_OUT'
+        });
       }
       if (!est || est === a.estoqueDestinoId) {
-        movProj.push({ itemId: a.itemId, estoqueId: a.estoqueDestinoId, ts, qtd: +a.quantidade, tipo: 'SCHEDULED_IN' });
+        movProj.push({
+          itemId: a.itemId,
+          itemNome: itemNomeById.get(a.itemId) ?? `#${a.itemId}`,
+          estoqueId: a.estoqueDestinoId,
+          estoqueNome: estoqueNomeById.get(a.estoqueDestinoId) ?? `#${a.estoqueDestinoId}`,
+          ts, qtd: +a.quantidade, tipo: 'SCHEDULED_IN'
+        });
       }
     }
 
-    const whereTransfAntes: any = {
-      ...(item ? { itemId: item } : {}),
-      ...(est ? { OR: [{ estoqueOrigemId: est }, { estoqueDestinoId: est }] } : {}),
-      dataTransferencia: { lt: inicio },
-    };
-
-    const transfAntes = await prisma.transferencia.findMany({
-      where: whereTransfAntes,
-      select: {
-        itemId: true,
-        estoqueOrigemId: true,
-        estoqueDestinoId: true,
-        quantidade: true,
-        dataTransferencia: true,
-      }
-    });
-
-    const saldoInicialMap = new Map<string, number>();
-    const keyIE = (i:number,e:number)=>`${i}:${e}`;
-    for (const t of transfAntes) {
-      const kOut = keyIE(t.itemId, t.estoqueOrigemId);
-      const kIn  = keyIE(t.itemId, t.estoqueDestinoId);
-      saldoInicialMap.set(kOut, (saldoInicialMap.get(kOut) ?? 0) - t.quantidade);
-      saldoInicialMap.set(kIn,  (saldoInicialMap.get(kIn)  ?? 0) + t.quantidade);
-    }
-
+    // --------- Agregação por bucket ----------
     const byBucket = new Map<string, LinhaAgg>();
-    const bump = (m:{ itemId:number; estoqueId:number; ts:Date; qtd:number; tipo:string; origem:'REAL'|'PROJ'; }) => {
+    const bump = (m: {
+      itemId:number; itemNome:string;
+      estoqueId:number; estoqueNome:string;
+      ts:Date; qtd:number; tipo:string;
+      origem:'REAL'|'PROJ';
+    }) => {
       const bucket = truncBucket(m.ts, granularity);
       const k = `${m.itemId}:${m.estoqueId}:${bucket}`;
       if (!byBucket.has(k)) {
-        byBucket.set(k, { itemId: m.itemId, estoqueId: m.estoqueId, bucket,
-          entradas: 0, saidas: 0, real: 0, projetado: 0, tipos: [] });
+        byBucket.set(k, {
+          itemId: m.itemId,
+          itemNome: m.itemNome,
+          estoqueId: m.estoqueId,
+          estoqueNome: m.estoqueNome,
+          bucket,
+          entradas: 0,
+          saidas: 0,
+          tipos: [],
+        });
       }
       const agg = byBucket.get(k)!;
-      if (m.origem === 'REAL') {
-        agg.real += m.qtd;
-        if (m.qtd > 0) agg.entradas += m.qtd;
-        if (m.qtd < 0) agg.saidas   += (-m.qtd);
-      } else {
-        agg.projetado += m.qtd;
-      }
+      if (m.qtd > 0) agg.entradas += m.qtd;
+      if (m.qtd < 0) agg.saidas   += (-m.qtd);
       if (!agg.tipos.includes(m.tipo)) agg.tipos.push(m.tipo);
     };
 
     for (const r of movReais) bump({ ...r, origem:'REAL' });
     for (const p of movProj)  bump({ ...p, origem:'PROJ'  });
 
-    const rows = [...byBucket.values()].sort((a,b)=>
-      a.bucket.localeCompare(b.bucket) || a.itemId - b.itemId || a.estoqueId - b.estoqueId
+    const linhasOut = [...byBucket.values()].sort(
+      (a,b)=>
+        a.bucket.localeCompare(b.bucket) ||
+        a.itemNome.localeCompare(b.itemNome) ||
+        a.estoqueNome.localeCompare(b.estoqueNome)
     );
-
-    const accMap = new Map<string, number>(saldoInicialMap);
-    const linhasOut: any[] = [];
-    for (const r of rows) {
-      const k = keyIE(r.itemId, r.estoqueId);
-      const prev  = accMap.get(k) ?? 0;
-      const saldo = prev + r.real;
-      const atp   = saldo + r.projetado;
-      accMap.set(k, saldo);
-      linhasOut.push({
-        itemId: r.itemId, estoqueId: r.estoqueId, bucket: r.bucket,
-        entradas: r.entradas, saidas: r.saidas, saldo, atp, tipos: r.tipos
-      });
-    }
 
     return reply.send({
       periodo: { inicio: inicio.toISOString(), fim: fim.toISOString(), granularity },
       filtros: { itemId: item ?? null, estoqueId: est ?? null },
-      saldoInicial: [...saldoInicialMap.entries()].map(([k,v])=>{
-        const [i,e]=k.split(':').map(Number); return { itemId:i, estoqueId:e, saldo:v };
-      }),
       linhas: linhasOut
     });
 

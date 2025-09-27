@@ -15,17 +15,18 @@ import NotificationBell from './NotificationBell';
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  onLogout: () => void;
 }
 
-const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
+export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const pathname = usePathname();
   const [openEquipamento, setOpenEquipamento] = useState(false);
   const [openGestao, setOpenGestao] = useState(false);
-  const { hasPermission, logout } = useAuth(); // 👈 pega logout do contexto
+  const { hasPermission, logout } = useAuth();
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
-    await logout(); // limpa cookie + caches + redireciona (implementado no AuthContext)
+    await logout();
   };
 
   return (

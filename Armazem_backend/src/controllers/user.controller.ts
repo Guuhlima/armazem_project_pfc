@@ -187,20 +187,30 @@ export async function editarUsuarios(
 }
 
 // Deletar usuarios
-export async function deletarUsuarios(
-  req: FastifyRequest<{ Params: Params }>,
-  reply: FastifyReply
-) {
+export const deletarUsuarios = async (  req: FastifyRequest<{ Body: Body; Params: Params }>,
+  reply: FastifyReply) => {
   try {
     const id = Number(req.params.id);
-    await prisma.usuario.delete({ where: { id } });
-    reply.send({ ok: true });
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      reply.status(404).send({ error: 'Usuário não encontrado' });
-    } else {
-      console.error(error);
-      reply.status(500).send({ error: 'Erro ao deletar usuário' });
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ message: 'ID inválido' });
     }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.notificacao.deleteMany({ where: { userId: id } });
+      await tx.passwordResetToken.deleteMany({ where: { userId: id }});
+      await tx.usuario.delete({ where: { id } });
+    });
+
+    return reply.status(204).send();
+  } catch (err: any) {
+    if (err?.code === 'P2003') {
+      return reply.status(409).send({
+        message:
+          'Não foi possível excluir. Existem registros dependentes relacionados a este usuário.',
+        detalhe: err?.meta?.constraint,
+      });
+    }
+    console.error(err);
+    return reply.status(500).send({ message: 'Erro ao excluir usuário.' });
   }
-}
+};
