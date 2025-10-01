@@ -26,6 +26,12 @@ enum AgendamentoStatus {
   FAILED
 }
 
+enum AlertaTipo {
+  ABAIXO_MINIMO
+  RUPTURA
+  EXCESSO
+}
+
 model Usuario {
   id        Int     @id @default(autoincrement())
   nome      String? @db.VarChar(255)
@@ -156,16 +162,36 @@ model Transferencia {
 }
 
 model EstoqueItem {
-  id         Int @id @default(autoincrement())
-  estoqueId  Int
-  itemId     Int
-  quantidade Int
+  id          Int          @id @default(autoincrement())
+  estoqueId   Int
+  itemId      Int
+  quantidade  Int          @default(0)
+  minimo      Int          @default(0)
+  alertaAtivo Boolean       @default(false)
 
-  estoque Estoque     @relation(fields: [estoqueId], references: [id])
-  item    Equipamento @relation(fields: [itemId], references: [id])
+  estoque     Estoque       @relation(fields: [estoqueId], references: [id])
+  item        Equipamento   @relation(fields: [itemId], references: [id])
+
+  alertas     AlertaEstoque[]
 
   @@unique([itemId, estoqueId], name: "itemId_estoqueId")
   @@map("estoque_itens")
+}
+
+model AlertaEstoque {
+  id         Int         @id @default(autoincrement())
+  estoqueId  Int
+  itemId     Int
+  tipo       AlertaTipo
+  mensagem   String
+  resolvido  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  resolvedAt DateTime?
+
+  estoqueItem EstoqueItem @relation(fields: [itemId, estoqueId], references: [itemId, estoqueId])
+
+  @@index([estoqueId, itemId, resolvido])
+  @@map("alertas_estoque")
 }
 
 model Role {

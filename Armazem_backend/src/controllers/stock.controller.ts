@@ -1,132 +1,129 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { EstoqueBodySchema, EstoqueParamsSchema } from 'schemas/stock.schema';
 import { Static } from '@sinclair/typebox';
 import { prisma } from '../lib/prisma';
+import { checarLimitesEGerenciarAlertas } from '../service/estoque-alertas.service';
 
-type Body = Static<typeof EstoqueBodySchema>;
-type Params = Static<typeof EstoqueParamsSchema>;
+// Schemas
+import { EstoqueBodySchema, EstoqueParamsSchema } from 'schemas/stock.schema';
+import { EstoqueMinimoBodySchema } from 'schemas/estoqueMinimo.schema';
 
-// === CADASTAR UM NOVO ESTOQUE ========
-export async function cadastrarEstoque(req: FastifyRequest<{ Body: Body }>, reply: FastifyReply) {
-    try {
-        const { nome } = req.body;
-        const novoEstoque = await prisma.estoque.create({ data: { nome } });
-        reply.send(novoEstoque);
-    } catch (error) {
-        reply.status(500).send({ error: 'Erro ao cadastrar estoque' });
-        console.error(error);
-    }
+// === Tipos (nomes únicos) ===
+type CreateEstoqueBody = Static<typeof EstoqueBodySchema>;
+type EstoqueIdParams = Static<typeof EstoqueParamsSchema>;
+type SetMinimoBody = Static<typeof EstoqueMinimoBodySchema>;
+type SetMinimoParams = { estoqueId: string; itemId: string };
+
+// === CADASTRAR UM NOVO ESTOQUE ========
+export async function cadastrarEstoque(
+  req: FastifyRequest<{ Body: CreateEstoqueBody }>,
+  reply: FastifyReply
+) {
+  try {
+    const { nome } = req.body;
+    const novoEstoque = await prisma.estoque.create({ data: { nome } });
+    reply.send(novoEstoque);
+  } catch (error) {
+    console.error(error);
+    reply.status(500).send({ error: 'Erro ao cadastrar estoque' });
+  }
 }
 
-// === VISUALIZAR UM ESTOQUE =====
+// === VISUALIZAR TODOS OS ESTOQUES =====
 export async function visualizarEstoque(_: FastifyRequest, reply: FastifyReply) {
-    try {
-        const estoques = await prisma.estoque.findMany();
-        reply.send(estoques);
-    } catch (error) {
-        reply.status(500).send({ error: 'Erro ao buscar estoques' });
-        console.error(error);
-    }
+  try {
+    const estoques = await prisma.estoque.findMany();
+    reply.send(estoques);
+  } catch (error) {
+    console.error(error);
+    reply.status(500).send({ error: 'Erro ao buscar estoques' });
+  }
 }
 
 // === VISUALIZAR ESTOQUE POR ID ====
-export async function visualizarEstoquePorId(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
-    try {
-        const { id } = req.params;
-        const estoque = await prisma.estoque.findUnique({ where: { id: parseInt(id) } });
-
-        if (!estoque) {
-            return reply.status(404).send({ error: 'Estoque não encontrado' });
-        }
-
-        reply.send(estoque);
-    } catch (error) {
-        reply.status(500).send({ error: 'Erro ao buscar estoque' });
-        console.error(error);
-    }
+export async function visualizarEstoquePorId(
+  req: FastifyRequest<{ Params: EstoqueIdParams }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = req.params;
+    const estoque = await prisma.estoque.findUnique({ where: { id: parseInt(id) } });
+    if (!estoque) return reply.status(404).send({ error: 'Estoque não encontrado' });
+    reply.send(estoque);
+  } catch (error) {
+    console.error(error);
+    reply.status(500).send({ error: 'Erro ao buscar estoque' });
+  }
 }
 
 // === EDITAR UM ESTOQUE =======
-export async function editarEstoque(req: FastifyRequest<{ Body: Body, Params: Params }>, reply: FastifyReply) {
-    try {
-        const { id } = req.params;
-        const { nome } = req.body;
-
-        const editarEstoque = await prisma.estoque.update({
-            where: { id: parseInt(id) },
-            data: { nome },
-        });
-
-        reply.send(editarEstoque);
-    } catch (error) {
-        reply.status(500).send({ error: 'Erro ao editar estoque' });
-        console.error(error);
-    }
+export async function editarEstoque(
+  req: FastifyRequest<{ Body: CreateEstoqueBody; Params: EstoqueIdParams }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = req.params;
+    const { nome } = req.body;
+    const editarEstoque = await prisma.estoque.update({
+      where: { id: parseInt(id) },
+      data: { nome },
+    });
+    reply.send(editarEstoque);
+  } catch (error) {
+    console.error(error);
+    reply.status(500).send({ error: 'Erro ao editar estoque' });
+  }
 }
 
-// === DELETAR UM ESTQOUE ====
-export async function deletarEstoque(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
-    try {
-        const { id } = req.params;
-
-        const deletarEstoque = await prisma.estoque.delete({
-            where: { id: parseInt(id) },
-        });
-
-        reply.send(deletarEstoque);
-    } catch (error: any) {
-        if (error.code === 'P2025') {
-            reply.status(404).send({ error: 'Estoque não encontrado' });
-        } else {
-            reply.status(500).send({ error: 'Erro ao deletar estoque' });
-            console.error(error);
-        }
+// === DELETAR UM ESTOQUE ====
+export async function deletarEstoque(
+  req: FastifyRequest<{ Params: EstoqueIdParams }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = req.params;
+    const deletarEstoque = await prisma.estoque.delete({ where: { id: parseInt(id) } });
+    reply.send(deletarEstoque);
+  } catch (error: any) {
+    console.error(error);
+    if (error.code === 'P2025') {
+      reply.status(404).send({ error: 'Estoque não encontrado' });
+    } else {
+      reply.status(500).send({ error: 'Erro ao deletar estoque' });
     }
+  }
 }
 
-// === VISUALIZAR ITENS POR ESTOQUES SEPARADOS ====
-export async function visualizarItensPorEstoque(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
-    try {
-        const { id } = req.params;
-
-        const estoque = await prisma.estoque.findUnique({
-            where: { id: parseInt(id) },
-            include: {
-                itens: {
-                    include: {
-                        item: true
-                    }
-                }
-            }
-        });
-
-        if (!estoque) return reply.status(404).send({ error: 'Estoque não encontrado' });
-
-        reply.send(estoque.itens);
-    } catch (error) {
-        reply.status(500).send({ error: 'Erro ao buscar itens do estoque' });
-        console.error(error);
-    }
+// === VISUALIZAR ITENS POR ESTOQUE ====
+export async function visualizarItensPorEstoque(
+  req: FastifyRequest<{ Params: EstoqueIdParams }>,
+  reply: FastifyReply
+) {
+  try {
+    const { id } = req.params;
+    const estoque = await prisma.estoque.findUnique({
+      where: { id: parseInt(id) },
+      include: { itens: { include: { item: true } } },
+    });
+    if (!estoque) return reply.status(404).send({ error: 'Estoque não encontrado' });
+    reply.send(estoque.itens);
+  } catch (error) {
+    console.error(error);
+    reply.status(500).send({ error: 'Erro ao buscar itens do estoque' });
+  }
 }
 
-// === VISUALIZAR MUES ESTOQUES =====
+// === MEUS ESTOQUES =====
 export async function meusEstoques(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);
-    if (!userId) {
-      return reply.code(401).send({ error: 'não autenticado' });
-    }
+    if (!userId) return reply.code(401).send({ error: 'não autenticado' });
 
     const vinculos = await prisma.usuarioEstoque.findMany({
       where: { usuarioId: userId },
       include: { estoque: true },
     });
 
-    const warehouses = vinculos.map(v => ({
-      id: v.estoque.id,
-      nome: v.estoque.nome,
-    }));
-
+    const warehouses = vinculos.map(v => ({ id: v.estoque.id, nome: v.estoque.nome }));
     return reply.send({ warehouses });
   } catch (error) {
     console.error(error);
@@ -134,6 +131,30 @@ export async function meusEstoques(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// === DEFINIR MÍNIMO DE UM ITEM NO ESTOQUE ===
+export async function definirMinimoItemNoEstoque(
+  req: FastifyRequest<{ Params: SetMinimoParams; Body: SetMinimoBody }>,
+  reply: FastifyReply
+) {
+  try {
+    const estoqueId = parseInt(req.params.estoqueId);
+    const itemId = parseInt(req.params.itemId);
+    const { minimo } = req.body;
+
+    const updated = await prisma.estoqueItem.upsert({
+      where: { itemId_estoqueId: { itemId, estoqueId } },
+      update: { minimo },
+      create: { itemId, estoqueId, quantidade: 0, minimo },
+    });
+
+    await checarLimitesEGerenciarAlertas(estoqueId, itemId);
+
+    return reply.send(updated);
+  } catch (error) {
+    console.error(error);
+    return reply.status(500).send({ error: 'Erro ao definir minimo' });
+  }
+}
 // ABAIXO CONTROLLERS PARA SOLICITAR VINCULO AO ESTOQUE E DESVINCULAR USUARIO
 
 export async function vincularMeAoEstoque(
@@ -181,7 +202,6 @@ export async function desvincularMeDoEstoque(
     return reply.code(500).send({ error: 'Erro ao desvincular usuário do estoque' });
   }
 }
-
 
 export async function vincularUsuarioAoEstoque(
   req: FastifyRequest<{ Params: { userId: string; estoqueId: string } }>,
@@ -231,7 +251,6 @@ export async function desvincularUsuarioDoEstoque(
     return reply.code(500).send({ error: 'Erro ao desvincular usuário do estoque' });
   }
 }
-
 
 export async function listarEstoquesDisponiveis(req: FastifyRequest, reply: FastifyReply) {
   try {

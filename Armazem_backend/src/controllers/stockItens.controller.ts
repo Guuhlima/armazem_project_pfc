@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { Static, Type } from '@sinclair/typebox';
 import { EstoqueItemBodySchema } from '../schemas/stockItens.schema';
+import { checarLimitesEGerenciarAlertas } from '../service/estoque-alertas.service';
 
 type Body = Static<typeof EstoqueItemBodySchema>;
 
@@ -29,6 +30,8 @@ export async function adicionarItemAoEstoque(
         quantidade
       }
     });
+
+    await checarLimitesEGerenciarAlertas(estoqueId, itemId);
 
     reply.send(upsert);
   } catch (error) {
