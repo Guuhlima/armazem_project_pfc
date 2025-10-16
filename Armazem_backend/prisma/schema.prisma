@@ -33,11 +33,11 @@ enum AlertaTipo {
 }
 
 model Usuario {
-  id        Int     @id @default(autoincrement())
-  nome      String? @db.VarChar(255)
-  email     String  @unique @db.VarChar(255)
-  matricula Int?
-  senha     String? @db.VarChar(255)
+  id                 Int     @id @default(autoincrement())
+  nome               String? @db.VarChar(255)
+  email              String  @unique @db.VarChar(255)
+  matricula          Int?
+  senha              String? @db.VarChar(255)
 
   roles              UsuarioRole[]
   estoques           UsuarioEstoque[]
@@ -49,8 +49,17 @@ model Usuario {
   estoqueTelegramNotify EstoqueTelegramNotify[]
   accessRequests        StockAccessRequest[]    @relation("RequestOwner")
   approvedRequests      StockAccessRequest[]    @relation("StockRequestApprover")
+  cookies               Ciente_cookies[]
 
   @@map("usuarios")
+}
+
+model Ciente_cookies {
+  id            Int    @id @default(autoincrement())
+  userId        Int
+  ciencia        Boolean
+
+  user Usuario @relation(fields: [userId], references: [id])
 }
 
 model Equipamento {

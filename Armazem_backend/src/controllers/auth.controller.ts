@@ -108,7 +108,6 @@ export async function refreshToken(
 
     const tokens = await rotateRefresh(req.server, payload.jti, payload.sub);
 
-    // Atualiza cookies
     setAuthCookies(reply, tokens);
 
     return reply.send(tokens);

@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import { ReactNode } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
+import 'sweetalert2/dist/sweetalert2.min.css';
 
 export const metadata = {
   title: 'Estoque App',

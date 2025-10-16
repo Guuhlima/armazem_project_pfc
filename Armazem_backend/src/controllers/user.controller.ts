@@ -17,7 +17,13 @@ export async function cadastrarUsuarios(
   reply: FastifyReply
 ) {
   try {
-    const { nome, email, matricula, senha } = req.body;
+    const { nome, email, senha, aceiteCookies } = req.body;
+
+    // Bloqueia criação caso não aceite os cookies
+    if (aceiteCookies !== true) {
+      return reply.status(400).send({ error: 'Consentimento obrigatório.' });
+    }
+
     const hashPassword = await bcrypt.hash(senha, 10);
     const emailNorm = email?.trim().toLowerCase();
 
@@ -28,15 +34,16 @@ export async function cadastrarUsuarios(
         update: {},
       });
 
+      // Cria o novo usuario
       const novoUsuario = await tx.usuario.create({
         data: {
           nome,
           email: emailNorm,
-          matricula,
           senha: hashPassword,
         },
       });
 
+      // Vincula com a role padrão
       await tx.usuarioRole.upsert({
         where: {
           usuarioId_roleId: { usuarioId: novoUsuario.id, roleId: rolePadrao.id },
@@ -44,6 +51,14 @@ export async function cadastrarUsuarios(
         update: {},
         create: { usuarioId: novoUsuario.id, roleId: rolePadrao.id },
       });
+
+      // Registra o aceite de cookies
+      await tx.ciente_cookies.create({
+        data: {
+          userId: novoUsuario.id,
+          ciencia: true,
+        }
+      })
 
       return novoUsuario;
     });
@@ -169,9 +184,9 @@ export async function editarUsuarios(
 ) {
   try {
     const id = Number(req.params.id);
-    const { nome, email, matricula, senha } = req.body;
+    const { nome, email, senha } = req.body;
 
-    const data: any = { nome, email, matricula };
+    const data: any = { nome, email };
     if (senha) data.senha = await bcrypt.hash(senha, 10);
 
     const usuario = await prisma.usuario.update({ where: { id }, data });

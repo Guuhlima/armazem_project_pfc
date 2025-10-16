@@ -17,28 +17,30 @@ export async function usuariosRoutes(app: FastifyInstance) {
     handler: cadastrarUsuarios,
   });
 
-  app.addHook("onRequest", app.authenticate);
+  await app.register(async (r) => {
+    r.addHook("onRequest", r.authenticate);
 
-  app.get("/visualizar", {
-    preHandler: [app.rbac.requirePerm("user:manage")],
-    handler: visualizarUsuarios,
-  });
+    r.get("/visualizar", {
+      preHandler: [r.rbac.requirePerm("user:manage")],
+      handler: visualizarUsuarios,
+    });
 
-  app.get("/visualizar/:id", {
-    schema: { params: UsuarioParamsSchema },
-    preHandler: [app.rbac.requirePerm("user:manage")],
-    handler: visualizarUsuariosPorId,
-  });
+    r.get("/visualizar/:id", {
+      schema: { params: UsuarioParamsSchema },
+      preHandler: [r.rbac.requirePerm("user:manage")],
+      handler: visualizarUsuariosPorId,
+    });
 
-  app.put("/editar/:id", {
-    schema: { params: UsuarioParamsSchema, body: UsuarioBodySchema },
-    preHandler: [app.rbac.requirePerm("user:manage")],
-    handler: editarUsuarios,
-  });
+    r.put("/editar/:id", {
+      schema: { params: UsuarioParamsSchema, body: UsuarioBodySchema },
+      preHandler: [r.rbac.requirePerm("user:manage")],
+      handler: editarUsuarios,
+    });
 
-  app.delete("/deletar/:id", {
-    schema: { params: UsuarioParamsSchema },
-    preHandler: [app.rbac.requirePerm("user:delete")],
-    handler: deletarUsuarios,
+    r.delete("/deletar/:id", {
+      schema: { params: UsuarioParamsSchema },
+      preHandler: [r.rbac.requirePerm("user:delete")],
+      handler: deletarUsuarios,
+    });
   });
 }
