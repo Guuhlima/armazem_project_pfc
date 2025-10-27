@@ -1,5 +1,5 @@
-import { FastifyInstance } from 'fastify';
-import { Type } from '@sinclair/typebox';
+import { FastifyInstance } from "fastify";
+import { Type } from "@sinclair/typebox";
 
 import {
   cadastrarEstoque,
@@ -16,19 +16,29 @@ import {
   listarEstoquesDisponiveis,
   solicitarAcessoAoEstoque,
   definirMinimoItemNoEstoque,
-} from '../controllers/stock.controller';
+  getSugerirFEFO,
+  postPickingFEFO,
+  postSaidaSerial,
+  getEstoqueItemConfig,
+  patchEstoqueItemAutoConfig,
+} from "../controllers/stock.controller";
 
 import {
   listarItensAbaixoDoMinimo,
   listarAlertasAbertos,
-} from '../controllers/stockAlerts.controller';
+} from "../controllers/stockAlerts.controller";
 
 import {
   EstoqueBodySchema,
   EstoqueParamsSchema,
-} from '../schemas/stock.schema';
+  PickingFefoBodySchema,
+  SaidaSerialBodySchema,
+  SugerirFefoQuerySchema,
+  AutoBodySchema,
+  EstoqueItemParamsSchema
+} from "../schemas/stock.schema";
 
-import { EstoqueMinimoBodySchema } from '../schemas/estoqueMinimo.schema';
+import { EstoqueMinimoBodySchema } from "../schemas/estoqueMinimo.schema";
 
 const SetMinimoParamsSchema = Type.Object({
   estoqueId: Type.String(),
@@ -40,50 +50,52 @@ const EstoqueIdOnlyParamsSchema = Type.Object({
 });
 
 export async function estoquesRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', app.authenticate);
+  app.addHook("onRequest", app.authenticate);
 
   // ===== Usuário x Estoques =====
-  app.get('/estoques/me', { handler: meusEstoques });
-  app.post('/estoques/:id/vincular-me', { handler: vincularMeAoEstoque });
-  app.delete('/estoques/:id/vincular-me', { handler: desvincularMeDoEstoque });
+  app.get("/estoques/me", { handler: meusEstoques });
+  app.post("/estoques/:id/vincular-me", { handler: vincularMeAoEstoque });
+  app.delete("/estoques/:id/vincular-me", { handler: desvincularMeDoEstoque });
 
-  app.get('/estoques/disponiveis', { handler: listarEstoquesDisponiveis });
-  app.post('/estoques/:id/solicitar-acesso', { handler: solicitarAcessoAoEstoque });
+  app.get("/estoques/disponiveis", { handler: listarEstoquesDisponiveis });
+  app.post("/estoques/:id/solicitar-acesso", {
+    handler: solicitarAcessoAoEstoque,
+  });
 
-  app.post('/usuarios/:userId/estoques/:estoqueId', {
-    preHandler: [app.rbac.requirePerm('user:manage')],
+  app.post("/usuarios/:userId/estoques/:estoqueId", {
+    preHandler: [app.rbac.requirePerm("user:manage")],
     handler: vincularUsuarioAoEstoque,
   });
-  app.delete('/usuarios/:userId/estoques/:estoqueId', {
-    preHandler: [app.rbac.requirePerm('user:manage')],
+  app.delete("/usuarios/:userId/estoques/:estoqueId", {
+    preHandler: [app.rbac.requirePerm("user:manage")],
     handler: desvincularUsuarioDoEstoque,
   });
 
   // ===== CRUD de Estoque (seu prefixo atual /stock) =====
-  app.post('/stock/cadastro', {
+  app.post("/stock/cadastro", {
     schema: { body: EstoqueBodySchema },
     handler: cadastrarEstoque,
   });
-  app.get('/stock/visualizar', { handler: visualizarEstoque });
-  app.get('/stock/visualizar/:id', {
+  app.get("/stock/visualizar", { handler: visualizarEstoque });
+  app.get("/stock/visualizar/:id", {
     schema: { params: EstoqueParamsSchema },
     handler: visualizarEstoquePorId,
   });
-  app.get('/stock/visualizar/:id/itens', {
+  app.get("/stock/visualizar/:id/itens", {
     schema: { params: EstoqueParamsSchema },
     handler: visualizarItensPorEstoque,
   });
-  app.put('/stock/editar/:id', {
+  app.put("/stock/editar/:id", {
     schema: { params: EstoqueParamsSchema, body: EstoqueBodySchema },
     handler: editarEstoque,
   });
-  app.delete('/stock/deletar/:id', {
+  app.delete("/stock/deletar/:id", {
     schema: { params: EstoqueParamsSchema },
     handler: deletarEstoque,
   });
 
   // ===== Minimo + Alertas =====
-  app.put('/estoques/:estoqueId/itens/:itemId/minimo', {
+  app.put("/estoques/:estoqueId/itens/:itemId/minimo", {
     schema: {
       params: SetMinimoParamsSchema,
       body: EstoqueMinimoBodySchema,
@@ -91,13 +103,38 @@ export async function estoquesRoutes(app: FastifyInstance) {
     handler: definirMinimoItemNoEstoque,
   });
 
-  app.get('/estoques/:estoqueId/itens-abaixo-minimo', {
+  app.get("/estoques/:estoqueId/itens-abaixo-minimo", {
     schema: { params: EstoqueIdOnlyParamsSchema },
     handler: listarItensAbaixoDoMinimo,
   });
 
-  app.get('/estoques/:estoqueId/alertas', {
+  app.get("/estoques/:estoqueId/alertas", {
     schema: { params: EstoqueIdOnlyParamsSchema },
     handler: listarAlertasAbertos,
+  });
+
+  app.get("/stock/sugerir-fefo", {
+    schema: { querystring: SugerirFefoQuerySchema },
+    handler: getSugerirFEFO,
+  });
+
+  app.post("/stock/picking-fefo", {
+    schema: { body: PickingFefoBodySchema },
+    handler: postPickingFEFO,
+  });
+
+  app.post("/stock/saida-serial", {
+    schema: { body: SaidaSerialBodySchema },
+    handler: postSaidaSerial,
+  });
+
+  app.get("/estoques/:estoqueId/itens/:itemId", {
+    schema: { params: EstoqueItemParamsSchema },
+    handler: getEstoqueItemConfig,
+  });
+
+  app.patch("/estoques/:estoqueId/itens/:itemId/auto", {
+    schema: { params: EstoqueItemParamsSchema, body: AutoBodySchema },
+    handler: patchEstoqueItemAutoConfig,
   });
 }

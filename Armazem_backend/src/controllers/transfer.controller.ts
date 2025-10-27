@@ -1,27 +1,32 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Static } from '@sinclair/typebox';
-import {
-  TransferenciaBodySchema,
-  TransferenciaParamsSchema
-} from '../schemas/transfer.schema';
+import { TransferenciaBodySchema, TransferenciaParamsSchema } from '../schemas/transfer.schema';
 import { prisma } from '../lib/prisma';
+import { TelegramService } from '../service/telegram.service';
+import { checarLimitesEGerenciarAlertas } from '../service/estoque-alertas.service';
+import * as inv from '../service/estoque.service';
 
 type Body = Static<typeof TransferenciaBodySchema>;
 type Params = Static<typeof TransferenciaParamsSchema>;
-
-// ABAIXO FEATURE DE REALIZAR TRANSFERENCIA ENTRE ESTOQUES DEBITANDO DE UM ESTOQUE E ACRESCENTANDO O VALOR EM OUTRO JUNTO COM O EQUIPAMENTO 
 
 export async function realizarTransferencia(
   req: FastifyRequest<{ Body: Body }>,
   reply: FastifyReply
 ) {
   try {
-    const { itemId, estoqueOrigemId, estoqueDestinoId, quantidade } = req.body;
-    const usuarioId = Number((req.user as any)?.id);
+    const {
+      itemId,
+      estoqueOrigemId,
+      estoqueDestinoId,
+      quantidade,
+      loteCodigo,
+      serialNumero,
+      referencia
+    } = req.body;
 
-    if (!usuarioId) {
-      return reply.status(401).send({ error: 'Não autenticado' });
-    }
+    const usuarioId = Number((req.user as any)?.id);
+    const usuarioNome = (req.user as any)?.nome ?? `user#${usuarioId}`;
+    if (!usuarioId) return reply.status(401).send({ error: 'Não autenticado' });
     if (estoqueOrigemId === estoqueDestinoId) {
       return reply.status(400).send({ error: 'Estoques de origem e destino devem ser diferentes' });
     }
@@ -29,38 +34,98 @@ export async function realizarTransferencia(
       return reply.status(400).send({ error: 'Quantidade deve ser maior que zero' });
     }
 
+    let createdTransferId: number | null = null;
+    let quando: Date | null = null;
+    let itemNome: string | null = null;
+
+    let loteId: number | null = null;
+    let serialId: number | null = null;
+
+    if (loteCodigo) {
+      const lote = await prisma.lote.findFirst({ where: { itemId, codigo: loteCodigo } });
+      if (!lote)
+        return reply.status(400).send({ error: `Lote ${loteCodigo} não encontrado para o item ${itemId}` });
+      loteId = lote.id;
+    }
+
+    if (serialNumero) {
+      const serial = await prisma.serial.findUnique({ where: { numero: serialNumero } });
+      if (!serial || serial.itemId !== itemId)
+        return reply.status(400).send({ error: `Serial ${serialNumero} não encontrado para o item ${itemId}` });
+      serialId = serial.id;
+    }
+
     await prisma.$transaction(async (tx) => {
-      const updated = await tx.estoqueItem.updateMany({
-        where: { itemId, estoqueId: estoqueOrigemId, quantidade: { gte: quantidade } },
-        data: { quantidade: { decrement: quantidade } },
+      const item = await tx.equipamento.findUnique({
+        where: { id: itemId },
+        select: { nome: true },
+      });
+      itemNome = item?.nome ?? `Item#${itemId}`;
+
+      await inv.transferir({
+        itemId,
+        quantidade,
+        origemId: estoqueOrigemId,
+        destinoId: estoqueDestinoId,
+        loteId: loteId ?? undefined,
+        serialId: serialId ?? undefined,
+        referencia: {
+          tabela: referencia?.tabela ?? 'transferencia',
+          id: referencia?.id ?? undefined,
+        },
       });
 
-      if (updated.count === 0) {
-        throw new Error('Quantidade insuficiente no estoque de origem');
-      }
-
-      await tx.estoqueItem.upsert({
-        where: { itemId_estoqueId: { itemId, estoqueId: estoqueDestinoId } },
-        update: { quantidade: { increment: quantidade } },
-        create: { itemId, estoqueId: estoqueDestinoId, quantidade },
-      });
-
-      await tx.transferencia.create({
+      const created = await tx.transferencia.create({
         data: {
           itemId,
           estoqueOrigemId,
           estoqueDestinoId,
           quantidade,
-          usuarioId, 
+          usuarioId,
         },
+        select: { id: true, dataTransferencia: true },
       });
+
+      createdTransferId = created.id;
+      quando = created.dataTransferencia ?? new Date();
     }, { isolationLevel: 'Serializable' });
 
-    return reply.send({ ok: true, message: 'Transferência realizada com sucesso' });
+    try {
+      await TelegramService.sendTransferNotification({
+        estoqueOrigemId,
+        estoqueDestinoId,
+        itemNome: itemNome ?? `Item#${itemId}`,
+        quantidade,
+        usuario: usuarioNome,
+        transferenciaId: createdTransferId!,
+        quando: quando!,
+      });
+    } catch (e) {
+      req.log?.warn?.({ err: e }, '[telegram] falha ao notificar transferência');
+    }
+
+    await Promise.allSettled([
+      checarLimitesEGerenciarAlertas(estoqueOrigemId, itemId),
+      checarLimitesEGerenciarAlertas(estoqueDestinoId, itemId),
+    ]);
+
+    return reply.send({
+      ok: true,
+      message: 'Transferência realizada com sucesso',
+      transferenciaId: createdTransferId,
+      itemNome,
+      quando,
+    });
   } catch (error: any) {
-    console.error(error);
-    if (error.message?.includes('insuficiente')) {
-      return reply.status(400).send({ error: error.message });
+    req.log?.error?.(error);
+    const msg = error?.message ?? '';
+    if (
+      msg.includes('Saldo insuficiente') ||
+      msg.includes('Item exige') ||
+      msg.includes('não é SERIAL') ||
+      msg.includes('vencido')
+    ) {
+      return reply.status(400).send({ error: msg });
     }
     return reply.status(500).send({ error: 'Erro ao realizar transferência' });
   }

@@ -1,311 +1,164 @@
-import { FastifyReply } from 'fastify';
-import {
-  cadastrarUsuarios,
-  login,
-  visualizarUsuarios,
-  visualizarUsuariosPorId,
-  deletarUsuarios,
-  editarUsuarios,
-} from '../../src/controllers/user.controller';
-
-jest.mock('../../src/lib/prisma', () => ({
-  prisma: {
-    usuario: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      delete: jest.fn(),
-      update: jest.fn(),
-    },
-  },
-}));
-
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(async (s: string) => `hashed(${s})`),
-  compare: jest.fn(async (a: string, b: string) => b === `hashed(${a})`),
-}));
-
-jest.mock('jsonwebtoken', () => ({
-  sign: jest.fn(() => 'signed.jwt.token'),
-}));
-
-import { prisma } from '../../src/lib/prisma';
+// tests/auth_usuarios.e2e.test.ts
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from '../utils/buildTestApp';
+import { prisma } from 'lib/prisma';  // ajuste caminho
+import { resetDb, seedRBAC, criarUsuarioComRoles } from '../utils/dbTestHelpers';
+import { syncAllRolePermsToRedis } from 'lib/rbac-sync';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-function createMockReply() {
-  const reply: Partial<FastifyReply> & {
-    statusCode?: number;
-    payload?: any;
-  } = {
-    status: jest.fn(function (this: any, code: number) {
-      this.statusCode = code;
-      return this;
-    }) as any,
-    send: jest.fn(function (this: any, payload: any) {
-      (this as any).payload = payload;
-      return this as any;
-    }) as any,
-  };
-  return reply as FastifyReply & { statusCode?: number; payload?: any };
+let app: FastifyInstance;
+
+beforeAll(async () => {
+  app = await buildTestApp();
+});
+
+beforeEach(async () => {
+  await resetDb();
+  await seedRBAC();
+  await syncAllRolePermsToRedis(app);
+});
+
+afterAll(async () => {
+  await app.close();
+  await prisma.$disconnect();
+});
+
+async function loginEObterToken(email: string, senha: string) {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/user/login',
+    payload: { email, senha },
+  });
+  expect(res.statusCode).toBe(200);
+  const body = res.json();
+  expect(typeof body.token).toBe('string');
+  jwt.verify(body.token, process.env.JWT_SECRET!); // JWT real
+  return body.token as string;
 }
 
-describe('User Controller', () => {
-  const OLD_ENV = process.env;
+describe('Cadastro público', () => {
+  it('POST /usuarios/cadastro cria usuário (senha com hash)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/usuarios/cadastro',
+      payload: { nome: 'Ana', email: 'ana@a.com', senha: '12345678asd' },
+    });
+    expect([200, 201]).toContain(res.statusCode);
+    const body = res.json();
+    expect(body).toMatchObject({ nome: 'Ana', email: 'ana@a.com' });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    process.env = { ...OLD_ENV, JWT_SECRET: 'secret', JWT_EXPIRES_IN: '24h' };
+    const db = await prisma.usuario.findUnique({ where: { email: 'ana@a.com' } });
+    expect(db).toBeTruthy();
+    expect(await bcrypt.compare('12345678asd', db!.senha!)).toBe(true);
   });
 
-  afterAll(() => {
-    process.env = OLD_ENV;
+  it('409 se email duplicado', async () => {
+    await prisma.usuario.create({
+      data: { nome: 'X', email: 'dup@a.com', senha: await bcrypt.hash('x', 10) },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/usuarios/cadastro',
+      payload: { nome: 'Y', email: 'dup@a.com', senha: 'y' },
+    });
+    expect([409, 400]).toContain(res.statusCode);
+  });
+});
+
+describe('Auth + RBAC', () => {
+  it('login válido retorna token', async () => {
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', 'senha');
+    expect(token).toBeTruthy();
   });
 
-  describe('cadastrarUsuarios', () => {
-    it('cria usuário e retorna payload', async () => {
-      (prisma.usuario.create as jest.Mock).mockResolvedValue({
-        id: 1,
-        nome: 'Ana',
-        email: 'ana@a.com',
-        matricula: '123',
-        senha: 'hashed(123456)',
-      });
+  it('GET /usuarios/visualizar requer user:manage', async () => {
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']); // ADMIN tem perms seedadas
+    const token = await loginEObterToken('adm@a.com', 'senha');
 
-      const req: any = {
-        body: { nome: 'Ana', email: 'ana@a.com', matricula: '123', senha: '123456' },
-      };
-      const reply = createMockReply();
-
-      await cadastrarUsuarios(req, reply);
-
-      expect(bcrypt.hash).toHaveBeenCalledWith('123456', 10);
-      expect(prisma.usuario.create).toHaveBeenCalledWith({
-        data: { nome: 'Ana', email: 'ana@a.com', matricula: '123', senha: 'hashed(123456)' },
-      });
-      expect(reply.payload).toEqual({
-        id: 1,
-        nome: 'Ana',
-        email: 'ana@a.com',
-        matricula: '123',
-        senha: 'hashed(123456)',
-      });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/usuarios/visualizar',
+      headers: { authorization: `Bearer ${token}` },
     });
-
-    it('retorna 409 em email duplicado (P2002)', async () => {
-      (prisma.usuario.create as jest.Mock).mockRejectedValue({ code: 'P2002' });
-      const req: any = { body: { nome: 'A', email: 'a@a', matricula: '1', senha: 'x' } };
-      const reply = createMockReply();
-
-      await cadastrarUsuarios(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(409);
-      expect(reply.payload).toEqual({ error: 'Email já está em uso' });
-    });
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json())).toBe(true);
   });
 
-  describe('login', () => {
-    it('retorna token em login válido', async () => {
-      (prisma.usuario.findUnique as jest.Mock).mockResolvedValue({
-        id: 1,
-        nome: 'Ana',
-        email: 'ana@a.com',
-        senha: 'hashed(123456)',
-        permissoes: [
-          { permissao: { nome: 'ADMIN' } },
-          { permissao: { nome: 'READ' } },
-        ],
-      });
-
-      const req: any = { body: { email: 'ana@a.com', senha: '123456' } };
-      const reply = createMockReply();
-
-      await login(req, reply);
-
-      expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
-        where: { email: 'ana@a.com' },
-        include: { permissoes: { include: { permissao: true } } },
-      });
-      expect(bcrypt.compare).toHaveBeenCalledWith('123456', 'hashed(123456)');
-      expect(jwt.sign).toHaveBeenCalled();
-      expect(reply.payload).toMatchObject({
-        message: 'Login realizado com sucesso',
-        token: 'signed.jwt.token',
-        user: { id: 1, nome: 'Ana', email: 'ana@a.com', permissoes: ['ADMIN', 'READ'] },
-      });
+  it('GET /usuarios/visualizar sem perm retorna 403/401', async () => {
+    // usuário sem roles
+    const hash = await bcrypt.hash('senha', 10);
+    await prisma.usuario.create({
+      data: { email: 'user@a.com', nome: 'User', senha: hash },
     });
+    const token = await loginEObterToken('user@a.com', 'senha');
 
-    it('400 se usuário não encontrado ou sem senha', async () => {
-      (prisma.usuario.findUnique as jest.Mock).mockResolvedValue(null);
-      const req: any = { body: { email: 'x@x', senha: 'a' } };
-      const reply = createMockReply();
-
-      await login(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(400);
-      expect(reply.payload).toEqual({ error: 'Usuário ou senha inválidos' });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/usuarios/visualizar',
+      headers: { authorization: `Bearer ${token}` },
     });
-
-    it('401 se senha incorreta', async () => {
-      (prisma.usuario.findUnique as jest.Mock).mockResolvedValue({
-        id: 1,
-        nome: 'Ana',
-        email: 'ana@a.com',
-        senha: 'hashed(outro)',
-        permissoes: [],
-      });
-      const req: any = { body: { email: 'ana@a.com', senha: '123456' } };
-      const reply = createMockReply();
-
-      await login(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(401);
-      expect(reply.payload).toEqual({ error: 'Senha incorreta' });
-    });
-
-    it('500 se faltar JWT_SECRET', async () => {
-      process.env.JWT_SECRET = '';
-      (prisma.usuario.findUnique as jest.Mock).mockResolvedValue({
-        id: 1,
-        nome: 'Ana',
-        email: 'ana@a.com',
-        senha: 'hashed(123456)',
-        permissoes: [],
-      });
-      const req: any = { body: { email: 'ana@a.com', senha: '123456' } };
-      const reply = createMockReply();
-
-      await login(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(500);
-      expect(reply.payload).toEqual({ error: 'Erro ao realizar login' });
-    });
+    expect([401, 403]).toContain(res.statusCode);
   });
 
-  describe('visualizarUsuarios', () => {
-    it('retorna usuários com permissoes mapeadas', async () => {
-      (prisma.usuario.findMany as jest.Mock).mockResolvedValue([
-        {
-          id: 1,
-          nome: 'Ana',
-          email: 'ana@a.com',
-          senha: 'hashed',
-          permissoes: [{ permissao: { nome: 'ADMIN' } }],
-        },
-      ]);
+  it('GET /usuarios/visualizar/:id com perm', async () => {
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', 'senha');
 
-      const reply = createMockReply();
-      await visualizarUsuarios({} as any, reply);
-
-      expect(reply.payload).toEqual([
-        {
-          id: 1,
-          nome: 'Ana',
-          email: 'ana@a.com',
-          senha: 'hashed',
-          permissoes: ['ADMIN'],
-        },
-      ]);
+    const alvo = await prisma.usuario.create({
+      data: { email: 'j@j', nome: 'Jo',  senha: await bcrypt.hash('x', 10) },
     });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/usuarios/visualizar/${alvo.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(expect.objectContaining({ id: alvo.id, email: 'j@j' }));
   });
 
-  describe('visualizarUsuariosPorId', () => {
-    it('200 quando encontra', async () => {
-      (prisma.usuario.findUnique as jest.Mock).mockResolvedValue({ id: 10, nome: 'Jo', email: 'j@j' });
+  it('PUT /usuarios/editar/:id (user:manage)', async () => {
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', 'senha');
 
-      const req: any = { params: { id: '10' } };
-      const reply = createMockReply();
-
-      await visualizarUsuariosPorId(req, reply);
-
-      expect(prisma.usuario.findUnique).toHaveBeenCalledWith({ where: { id: 10 } });
-      expect(reply.payload).toEqual({ id: 10, nome: 'Jo', email: 'j@j' });
+    const u = await prisma.usuario.create({
+      data: { email: 'v@v', nome: 'Velho',  senha: await bcrypt.hash('abc32435@', 10) },
     });
 
-    it('404 quando não encontra', async () => {
-      (prisma.usuario.findUnique as jest.Mock).mockResolvedValue(null);
-
-      const req: any = { params: { id: '99' } };
-      const reply = createMockReply();
-
-      await visualizarUsuariosPorId(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(404);
-      expect(reply.payload).toEqual({ error: 'Usuário não encontrado' });
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/usuarios/editar/${u.id}`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { nome: 'Novo', email: 'novo@n.com', senha: 'abc32435@' },
     });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toMatchObject({ id: u.id, nome: 'Novo', email: 'novo@n.com' });
+
+    const db = await prisma.usuario.findUnique({ where: { id: u.id } });
+    expect(await bcrypt.compare('abc32435@', db!.senha!)).toBe(true);
   });
 
-  describe('deletarUsuarios', () => {
-    it('deleta e retorna sucesso', async () => {
-      (prisma.usuario.delete as jest.Mock).mockResolvedValue(undefined);
+  it('DELETE /usuarios/deletar/:id (user:delete)', async () => {
+    // cria role/permissions já seedadas; ADMIN tem user:delete pelo seedRBAC()
+    await criarUsuarioComRoles({ email: 'deleter@a.com', senha: 'senha' }, ['ADMIN']);
+    const token = await loginEObterToken('deleter@a.com', 'senha');
 
-      const req: any = { params: { id: '7' } };
-      const reply = createMockReply();
-
-      await deletarUsuarios(req, reply);
-
-      expect(prisma.usuario.delete).toHaveBeenCalledWith({ where: { id: 7 } });
-      expect(reply.payload).toBe('Sucesso ao deletar usuário');
+    const u = await prisma.usuario.create({
+      data: { email: 'd@d', nome: 'Del', senha: await bcrypt.hash('x', 10) },
     });
 
-    it('404 em P2025', async () => {
-      (prisma.usuario.delete as jest.Mock).mockRejectedValue({ code: 'P2025' });
-
-      const req: any = { params: { id: '7' } };
-      const reply = createMockReply();
-
-      await deletarUsuarios(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(404);
-      expect(reply.payload).toEqual({ error: 'Usuário não encontrado' });
-    });
-  });
-
-  describe('editarUsuarios', () => {
-    it('atualiza usuário', async () => {
-      (prisma.usuario.update as jest.Mock).mockResolvedValue({
-        id: 2,
-        nome: 'Novo',
-        email: 'novo@n.com',
-        matricula: 'm2',
-        senha: 'hashed(abc)',
-      });
-
-      const req: any = {
-        params: { id: '2' },
-        body: { nome: 'Novo', email: 'novo@n.com', matricula: 'm2', senha: 'abc' },
-      };
-      const reply = createMockReply();
-
-      await editarUsuarios(req, reply);
-
-      expect(bcrypt.hash).toHaveBeenCalledWith('abc', 10);
-      expect(prisma.usuario.update).toHaveBeenCalledWith({
-        where: { id: 2 },
-        data: { nome: 'Novo', email: 'novo@n.com', matricula: 'm2', senha: 'hashed(abc)' },
-      });
-      expect(reply.payload).toEqual({
-        id: 2,
-        nome: 'Novo',
-        email: 'novo@n.com',
-        matricula: 'm2',
-        senha: 'hashed(abc)',
-      });
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/usuarios/deletar/${u.id}`,
+      headers: { authorization: `Bearer ${token}` },
     });
 
-    it('404 em P2025', async () => {
-      (prisma.usuario.update as jest.Mock).mockRejectedValue({ code: 'P2025' });
-
-      const req: any = {
-        params: { id: '2' },
-        body: { nome: 'X', email: 'x@x', matricula: 'm', senha: 's' },
-      };
-      const reply = createMockReply();
-
-      await editarUsuarios(req, reply);
-
-      expect(reply.status).toHaveBeenCalledWith(404);
-      expect(reply.payload).toEqual({ error: 'Usuário não encontrado' });
-    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('Sucesso ao deletar usuário');
+    expect(await prisma.usuario.findUnique({ where: { id: u.id } })).toBeNull();
   });
 });

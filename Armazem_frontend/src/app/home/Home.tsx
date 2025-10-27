@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import withAuth from '../components/withAuth';
-import { api } from '@/services/api';
+import api from '@/services/api';
 import Sidebar from '../components/Sidebar';
 import TableEquipamentos from '../components/TableEquipamentos';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +19,7 @@ type BackendEquip = {
   equipamento?: string | null;
   quantidade?: number | null;
   data?: string | Date | null;
+  warehouseId?: number | null; // útil no fallback
 };
 
 const Home = () => {
@@ -28,14 +29,40 @@ const Home = () => {
 
   const router = useRouter();
   const { logout } = useAuth();
-  const { loading, isLinked, names, refresh } = useMyWarehouses();
+
+  const { loading, isLinked, names, refresh, warehouses } = useMyWarehouses();
+
+  const linkedWarehouseIds = useMemo(
+    () => (warehouses || []).map(w => w.id),
+    [warehouses]
+  );
+
+  const warehousesParam = useMemo(
+    () => linkedWarehouseIds.join(','),
+    [linkedWarehouseIds]
+  );
 
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get<BackendEquip[]>('/equipment/visualizar');
+        if (loading) return;
 
-        const normalized: Equipamento[] = (data ?? []).map((e) => ({
+        if (!isLinked || linkedWarehouseIds.length === 0) {
+          setEquipamentos([]);
+          return;
+        }
+
+        const { data } = await api.get<BackendEquip[]>('/equipment/visualizar', {
+          params: { warehouses: warehousesParam },
+        });
+
+        const filtered = (Array.isArray(data) ? data : []).filter(item =>
+          item?.warehouseId == null
+            ? true // se o back já filtrou, provavelmente nem vem esse campo
+            : linkedWarehouseIds.includes(item.warehouseId!)
+        );
+
+        const normalized: Equipamento[] = filtered.map((e) => ({
           id: e.id,
           nome: (e.nome ?? e.equipamento ?? '—').toString(),
           quantidade: e.quantidade ?? 0,
@@ -53,7 +80,7 @@ const Home = () => {
         setEquipamentos([]);
       }
     })();
-  }, []);
+  }, [loading, isLinked, warehousesParam, linkedWarehouseIds]);
 
   const handleCardClick = () => {
     if (isLinked) router.push('/estoque/acess');
@@ -100,7 +127,6 @@ const Home = () => {
             <CardContent className="p-6 flex items-center justify-between">
               <div className="space-y-1">
                 <h3 className="text-sm text-zinc-500">Armazém</h3>
-
                 {loading ? (
                   <div className="h-5 w-48 bg-zinc-200 dark:bg-zinc-700 animate-pulse rounded" />
                 ) : isLinked ? (
@@ -128,20 +154,18 @@ const Home = () => {
 
         <section className="mt-8">
           <h2 className="text-lg font-semibold mb-4">Últimos Equipamentos</h2>
-          <TableEquipamentos data={equipamentos} />
+          {/* Evita “piscar” dados enquanto carrega os armazéns */}
+          <TableEquipamentos data={loading ? [] : equipamentos} />
         </section>
       </main>
 
-      {/* Modal de solicitação de acesso ao armazém */}
       <RequestWarehouseModal
         open={openReq}
         onClose={() => setOpenReq(false)}
         onRequested={() => {
-          // atualiza o hook para refletir mudanças (ex.: exibir nome do armazém após aprovação)
+          // após solicitar acesso, atualiza lista de armazéns vinculados
           refresh();
         }}
-        // opcional: ocultar armazéns já vinculados
-        // excludeIds={linkedWarehouseIds}
       />
     </div>
   );

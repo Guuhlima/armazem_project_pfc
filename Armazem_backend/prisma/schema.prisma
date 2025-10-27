@@ -32,11 +32,16 @@ enum AlertaTipo {
   EXCESSO
 }
 
+enum RastreioTipo {
+  NONE
+  LOTE
+  SERIAL
+}
+
 model Usuario {
   id                 Int     @id @default(autoincrement())
   nome               String? @db.VarChar(255)
   email              String  @unique @db.VarChar(255)
-  matricula          Int?
   senha              String? @db.VarChar(255)
 
   roles              UsuarioRole[]
@@ -63,15 +68,80 @@ model Ciente_cookies {
 }
 
 model Equipamento {
-  id             Int                     @id @default(autoincrement())
-  nome           String?                 @map("equipamento") @db.VarChar(255)
+  id             Int               @id @default(autoincrement())
+  nome           String?           @map("equipamento") @db.VarChar(255)
   quantidade     Int?
-  data           DateTime?               @db.Date
+  data           DateTime?         @db.Date
   transferencias Transferencia[]
   estoqueItens   EstoqueItem[]
   agendamentos   TransferenciaAgendada[]
 
+  rastreioTipo   RastreioTipo      @default(NONE)
+
+  lotes          Lote[]
+  seriais        Serial[]
+  movimentos   MovEstoque[] 
+
   @@map("equipamentos")
+}
+
+
+model Lote {
+  id         Int        @id @default(autoincrement())
+  itemId     Int
+  codigo     String
+  validade   DateTime?  @db.Date
+  createdAt  DateTime   @default(now())
+
+  item       Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  seriais    Serial[]
+  // Movimentações por lote
+  movimentos MovEstoque[]
+
+  @@unique([itemId, codigo], name: "unique_lote_por_item")
+  @@index([itemId, validade])
+  @@map("lotes")
+}
+
+model Serial {
+  id         Int        @id @default(autoincrement())
+  itemId     Int
+  numero     String     @unique
+  loteId     Int?       
+  createdAt  DateTime   @default(now())
+
+  item       Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  lote       Lote?       @relation(fields: [loteId], references: [id], onDelete: SetNull)
+
+  movimentos MovEstoque[]
+
+  @@index([itemId, loteId])
+  @@map("seriais")
+}
+
+model MovEstoque {
+  id               Int          @id @default(autoincrement())
+  itemId           Int
+  loteId           Int?
+  serialId         Int?
+  estoqueOrigemId  Int?
+  estoqueDestinoId Int?
+  quantidade       Int
+  tipoEvento       String 
+  referenciaTabela String?
+  referenciaId     Int?
+  createdAt        DateTime     @default(now())
+
+  item     Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  lote     Lote?       @relation(fields: [loteId], references: [id], onDelete: Restrict)
+  serial   Serial?     @relation(fields: [serialId], references: [id], onDelete: Restrict)
+  origem   Estoque?    @relation("MovOrigem", fields: [estoqueOrigemId], references: [id], onDelete: Restrict)
+  destino  Estoque?    @relation("MovDestino", fields: [estoqueDestinoId], references: [id], onDelete: Restrict)
+
+  @@index([itemId, loteId, serialId])
+  @@index([estoqueOrigemId])
+  @@index([estoqueDestinoId])
+  @@map("mov_estoque")
 }
 
 model PasswordResetToken {
@@ -100,6 +170,10 @@ model Estoque {
 
   agendamentosOrigem  TransferenciaAgendada[] @relation("AgendamentoOrigem") // ← novo
   agendamentosDestino TransferenciaAgendada[] @relation("AgendamentoDestino") // ← novo
+
+  movimentosOrigem  MovEstoque[] @relation("MovOrigem")
+  movimentosDestino MovEstoque[] @relation("MovDestino")
+
 
   usuarios              UsuarioEstoque[]
   estoqueTelegramNotify EstoqueTelegramNotify[]
@@ -171,16 +245,20 @@ model Transferencia {
 }
 
 model EstoqueItem {
-  id          Int          @id @default(autoincrement())
-  estoqueId   Int
-  itemId      Int
-  quantidade  Int          @default(0)
-  minimo      Int          @default(0)
-  alertaAtivo Boolean       @default(false)
+  id               Int         @id @default(autoincrement())
+  estoqueId        Int
+  itemId           Int
+  quantidade       Int         @default(0)
+  minimo           Int         @default(0)
+  maximo           Int?
+  multiplo         Int?
+  alertaativo      Boolean     @default(false)
+  autoAtivo        Boolean     @default(false)
+  origemPreferidaId Int?
+  leadTimeDias     Int?
 
-  estoque     Estoque       @relation(fields: [estoqueId], references: [id])
-  item        Equipamento   @relation(fields: [itemId], references: [id])
-
+  estoque     Estoque     @relation(fields: [estoqueId], references: [id])
+  item        Equipamento @relation(fields: [itemId], references: [id])
   alertas     AlertaEstoque[]
 
   @@unique([itemId, estoqueId], name: "itemId_estoqueId")
@@ -196,6 +274,7 @@ model AlertaEstoque {
   resolvido  Boolean     @default(false)
   createdAt  DateTime    @default(now())
   resolvedAt DateTime?
+  ultimoEnvioAt DateTime? 
 
   estoqueItem EstoqueItem @relation(fields: [itemId, estoqueId], references: [itemId, estoqueId])
 
@@ -291,6 +370,10 @@ model TransferenciaAgendada {
   status              AgendamentoStatus @default(PENDING)
   tentativas          Int               @default(0)
   erroUltimaTentativa String?
+
+  origemTipo   String?
+  motivo       String?
+  dedupKey     String?   @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

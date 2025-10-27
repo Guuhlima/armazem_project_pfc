@@ -7,13 +7,14 @@ import {
   deletarUsuarios,
 } from "../controllers/user.controller";
 import {
-  UsuarioBodySchema,
+  UsuarioCreateBodySchema,
+  UsuarioUpdateBodySchema,
   UsuarioParamsSchema,
 } from "../schemas/user.schema";
 
 export async function usuariosRoutes(app: FastifyInstance) {
   app.post("/cadastro", {
-    schema: { body: UsuarioBodySchema },
+    schema: { body: UsuarioCreateBodySchema },
     handler: cadastrarUsuarios,
   });
 
@@ -32,7 +33,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     });
 
     r.put("/editar/:id", {
-      schema: { params: UsuarioParamsSchema, body: UsuarioBodySchema },
+      schema: { params: UsuarioParamsSchema, body: UsuarioUpdateBodySchema },
       preHandler: [r.rbac.requirePerm("user:manage")],
       handler: editarUsuarios,
     });

@@ -163,9 +163,8 @@ export default function Register() {
       return;
     }
 
-    // 1) Pede consentimento antes de enviar
     const aceitou = await pedirConsentimento();
-    if (!aceitou) return; // usuário cancelou ou não aceitou
+    if (!aceitou) return;
 
     setLoading(true);
     try {

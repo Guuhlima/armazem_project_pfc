@@ -1,18 +1,16 @@
 import { z } from 'zod';
 
 export const transferSchema = z.object({
-  itemId: z.coerce.number().int(),
-  estoqueOrigemId: z.coerce.number().int(),
-  estoqueDestinoId: z.coerce.number().int(),
-  quantidade: z.coerce.number().min(1, 'A quantidade deve ser maior que 0'),
-}).superRefine((data, ctx) => {
-  if (data.estoqueDestinoId === data.estoqueOrigemId) {
-    ctx.addIssue({
-      path: ['estoqueDestinoId'],
-      code: z.ZodIssueCode.custom,
-      message: 'O estoque de destino deve ser diferente do estoque de origem',
-    });
-  }
+  itemId: z.number().int(),
+  estoqueOrigemId: z.number().int(),
+  estoqueDestinoId: z.number().int(),
+  quantidade: z.number().int().positive(),
+  executarEm: z.string().datetime().optional(),
+  loteCodigo: z.string().trim().min(1).optional(),
+  serialNumero: z.string().trim().min(1).optional(),
+}).refine((data) => data.estoqueOrigemId !== data.estoqueDestinoId, {
+  message: 'Estoques de origem e destino devem ser diferentes',
+  path: ['estoqueDestinoId'],
 });
 
 export type TransferSchemaType = z.infer<typeof transferSchema>;

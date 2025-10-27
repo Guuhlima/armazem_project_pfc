@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import ConfigUsuarioDialog from './ModalConfiguracao';
 import { api } from '@/services/api';
 import Swal from 'sweetalert2';
@@ -15,6 +15,20 @@ interface Usuario {
   nome: string | null;
   email: string;
   permissoes: string[];
+}
+
+function maskEmail(email: string, keep: number = 3, showDomain: boolean = true) {
+  if (!email) return email;
+  const [local, domain = ''] = email.split('@');
+  if (!local) return email;
+
+  const keepN = Math.min(keep, local.length);
+  const head = local.slice(0, keepN);
+  const restLen = Math.max(local.length - keepN, 0);
+  const maskedLocal = head + (restLen > 0 ? '*'.repeat(restLen) : '');
+
+  if (!showDomain || !domain) return maskedLocal + (domain ? '@****' : '');
+  return `${maskedLocal}@${domain}`;
 }
 
 const TableUsuario = () => {
@@ -69,7 +83,11 @@ const TableUsuario = () => {
     };
   }, [isSuper, isAdmin]);
 
-  // SweetAlert2 com classes Tailwind semelhantes ao shadcn
+  const displayEmail = useCallback(
+    (email: string) => (isSuper ? email : maskEmail(email, 3, true)),
+    [isSuper]
+  );
+
   const swal = Swal.mixin({
     buttonsStyling: false,
     customClass: {
@@ -87,7 +105,7 @@ const TableUsuario = () => {
 
   const handleDelete = async (id: number) => {
     const alvo = rows.find(r => r.id === id);
-    const nomeOuEmail = alvo?.nome || alvo?.email || `ID ${id}`;
+    const nomeOuEmail = alvo?.nome || (alvo ? displayEmail(alvo.email) : `ID ${id}`);
 
     const result = await swal.fire({
       title: 'Excluir usuário?',
@@ -142,7 +160,9 @@ const TableUsuario = () => {
           <thead className="bg-muted">
             <tr>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">Nome</th>
-              <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">Email</th>
+              <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">
+                {isSuper ? 'Email' : 'Email (parcial)'}
+              </th>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">Permissões</th>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground text-right">Ações</th>
             </tr>
@@ -175,7 +195,12 @@ const TableUsuario = () => {
                     className={`hover:bg-muted/50 transition-colors ${isDeletingThis ? 'opacity-60' : ''}`}
                   >
                     <td className="px-4 py-3">{usuario.nome ?? '—'}</td>
-                    <td className="px-4 py-3">{usuario.email}</td>
+                    <td
+                      className="px-4 py-3"
+                      title={isSuper ? 'E-mail completo' : 'E-mail parcial (anonimizado)'}
+                    >
+                      {displayEmail(usuario.email)}
+                    </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">
                       {(usuario.permissoes ?? []).join(', ')}
                     </td>

@@ -62,18 +62,21 @@ const FormCreateItem = () => {
       const res = await api.post('/equipment/cadastro', {
         nome: data.nome,
         quantidade: data.quantidade,
+        minimo: data.minimo,
         data: data.data,
       });
 
       const itemId = res?.data?.id;
       const estoqueId = data.estoqueId;
       const quantidade = data.quantidade;
+      const minimo = data.minimo;
 
-      if (data.vincularEstoque && estoqueId && itemId && quantidade > 0) {
+      if (data.vincularEstoque && estoqueId && itemId && quantidade > 0 && minimo > 0) {
         try {
           await api.post(`/stockmovi/cadastro/${estoqueId}/adicionar-equipamento`, {
             itemId,
             quantidade,
+            minimo
           });
         } catch (err) {
           console.error('Erro ao vincular ao estoque:', err);
@@ -144,6 +147,18 @@ const FormCreateItem = () => {
                 {errors.quantidade && (
                   <p className="text-red-500 text-sm mt-1">{errors.quantidade.message}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Quantidade minima ao estoque</label>
+                  <Input
+                    type="number"
+                    {...register('minimo', { valueAsNumber: true})}
+                    placeholder="Ex: 1"
+                  />
+                  {errors.minimo && (
+                    <p className='text-red-500 text-sm mt-1'>{errors.minimo.message}</p>
+                  )}
               </div>
 
               <div>

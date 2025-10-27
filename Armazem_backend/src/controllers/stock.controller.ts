@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { Static } from '@sinclair/typebox';
 import { prisma } from '../lib/prisma';
 import { checarLimitesEGerenciarAlertas } from '../service/estoque-alertas.service';
+import { sugerirFEFO, pickingFEFO, saidaPorSerial } from 'service/estoque.service';
 
 // Schemas
 import { EstoqueBodySchema, EstoqueParamsSchema } from 'schemas/stock.schema';
@@ -131,7 +132,7 @@ export async function meusEstoques(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
-// === DEFINIR MÍNIMO DE UM ITEM NO ESTOQUE ===
+// DEFINIR MÍNIMO DE UM ITEM NO ESTOQUE ===
 export async function definirMinimoItemNoEstoque(
   req: FastifyRequest<{ Params: SetMinimoParams; Body: SetMinimoBody }>,
   reply: FastifyReply
@@ -329,5 +330,164 @@ export async function solicitarAcessoAoEstoque(
   } catch (err) {
     console.error(err);
     return reply.code(500).send({ error: 'Erro ao solicitar acesso' });
+  }
+}
+
+// FEFO
+export async function getSugerirFEFO(
+  req: FastifyRequest<{ Querystring: { itemId: string; estoqueId: string; take?: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { itemId, estoqueId, take } = req.query;
+    const data = await sugerirFEFO(Number(itemId), Number(estoqueId), Number(take ?? 20));
+    return reply.send(data);
+  } catch (e: any) {
+    return reply.code(400).send({ error: e?.message ?? 'Erro ao sugerir FEFO' });
+  }
+}
+
+export async function postPickingFEFO(
+  req: FastifyRequest<{ Body: {
+    estoqueId: number; itemId: number; quantidadeSolicitada: number;
+    referencia?: { tabela?: string; id?: number };
+  } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { estoqueId, itemId, quantidadeSolicitada, referencia } = req.body;
+    const r = await pickingFEFO({ estoqueId, itemId, quantidadeSolicitada, referencia });
+    return reply.send(r);
+  } catch (e: any) {
+    return reply.code(400).send({ error: e?.message ?? 'Erro no picking FEFO' });
+  }
+}
+
+export async function postSaidaSerial(
+  req: FastifyRequest<{ Body: {
+    estoqueId: number; itemId: number; serialNumero: string;
+    referencia?: { tabela?: string; id?: number };
+  } }>,
+  reply: FastifyReply
+) {
+  try {
+    const { estoqueId, itemId, serialNumero, referencia } = req.body;
+    const r = await saidaPorSerial({ estoqueId, itemId, serialNumero, referencia });
+    return reply.send(r);
+  } catch (e: any) {
+    return reply.code(400).send({ error: e?.message ?? 'Erro na saída por serial' });
+  }
+}
+
+export async function getEstoqueItemConfig(
+  req: FastifyRequest<{ Params: { estoqueId: string; itemId: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const estoqueId = Number(req.params.estoqueId);
+    const itemId = Number(req.params.itemId);
+
+    const ei = await prisma.estoqueItem.findUnique({
+      where: { itemId_estoqueId: { itemId, estoqueId } },
+      select: {
+        itemId: true,
+        estoqueId: true,
+        quantidade: true,
+        minimo: true,
+        autoAtivo: true,
+        maximo: true,
+        multiplo: true,
+        origemPreferidaId: true,
+        leadTimeDias: true,
+      },
+    });
+
+    if (!ei) {
+      return reply.send({
+        itemId,
+        estoqueId,
+        quantidade: 0,
+        minimo: 0,
+        autoAtivo: false,
+        maximo: null,
+        multiplo: null,
+        origemPreferidaId: null,
+        leadTimeDias: null,
+      });
+    }
+
+    return reply.send(ei);
+  } catch (e) {
+    req.log?.error(e, 'erro getEstoqueItemConfig');
+    return reply.status(500).send({ error: 'Erro ao obter config do item no estoque' });
+  }
+}
+
+// PATCH /estoques/:estoqueId/itens/:itemId/auto
+export async function patchEstoqueItemAutoConfig(
+  req: FastifyRequest<{
+    Params: { estoqueId: string; itemId: string };
+    Body: Partial<{
+      autoAtivo: boolean;
+      maximo: number | null;
+      multiplo: number | null;
+      origemPreferidaId: number | null;
+      leadTimeDias: number | null;
+    }>;
+  }>,
+  reply: FastifyReply
+) {
+  try {
+    const estoqueId = Number(req.params.estoqueId);
+    const itemId = Number(req.params.itemId);
+    const { autoAtivo, maximo, multiplo, origemPreferidaId, leadTimeDias } = req.body ?? {};
+
+    if (multiplo != null && multiplo < 1) {
+      return reply.status(400).send({ error: 'multiplo deve ser >= 1' });
+    }
+    if (maximo != null && maximo < 0) {
+      return reply.status(400).send({ error: 'maximo deve ser >= 0' });
+    }
+
+    const updated = await prisma.estoqueItem.upsert({
+      where: { itemId_estoqueId: { itemId, estoqueId } },
+      create: {
+        itemId,
+        estoqueId,
+        quantidade: 0,
+        minimo: 0,
+        autoAtivo: !!autoAtivo,
+        maximo: maximo ?? null,
+        multiplo: multiplo ?? null,
+        origemPreferidaId: origemPreferidaId ?? null,
+        leadTimeDias: leadTimeDias ?? null,
+      } as any,
+      update: {
+        ...(autoAtivo !== undefined ? { autoAtivo } : {}),
+        ...(maximo !== undefined ? { maximo } : {}),
+        ...(multiplo !== undefined ? { multiplo } : {}),
+        ...(origemPreferidaId !== undefined ? { origemPreferidaId } : {}),
+        ...(leadTimeDias !== undefined ? { leadTimeDias } : {}),
+      },
+      select: {
+        itemId: true,
+        estoqueId: true,
+        quantidade: true,
+        minimo: true,
+        autoAtivo: true,
+        maximo: true,
+        multiplo: true,
+        origemPreferidaId: true,
+        leadTimeDias: true,
+      },
+    });
+
+    // opcional: já dispara a checagem/automação após salvar
+    await checarLimitesEGerenciarAlertas(estoqueId, itemId).catch(() => {});
+
+    return reply.send(updated);
+  } catch (e) {
+    req.log?.error(e, 'erro patchEstoqueItemAutoConfig');
+    return reply.status(500).send({ error: 'Erro ao salvar automação do item' });
   }
 }

@@ -44,3 +44,36 @@ export async function updateUserStockRole(req: FastifyRequest, reply: FastifyRep
 
   return reply.send({ ok: true });
 }
+
+export async function listUserStocks(
+  req: FastifyRequest<{ Params: { userId: string } }>,
+  reply: FastifyReply
+) {
+  const userId = Number(req.params.userId);
+
+  try {
+    const vinculos = await prisma.usuarioEstoque.findMany({
+      where: { usuarioId: userId },
+      select: {
+        estoqueId: true,
+        role: true,
+        estoque: { select: { id: true, nome: true } },
+      },
+      orderBy: { estoqueId: 'asc' },
+    });
+
+    const items = vinculos.map(v => ({
+      id: v.estoque.id,
+      nome: v.estoque.nome,
+      role: v.role,
+    }));
+
+    return reply.send({ items });
+  } catch (error) {
+    console.error('Erro ao listar estoques do usuário:', error);
+    return reply.status(500).send({
+      error: 'Erro interno ao listar estoques do usuário',
+      message: (error as Error).message,
+    });
+  }
+}

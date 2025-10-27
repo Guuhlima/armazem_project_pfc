@@ -23,10 +23,12 @@ import { requestsRoutes } from "./routes/requests.routes";
 import { adminUserStockRoutes } from "./routes/adminUserStock.routes";
 import { agendamentoRoutes } from "./routes/agendamento.routes";
 import { movimentacoesRoutes } from "routes/movimentacoes.routes";
-
+import { recebimentoRoutes } from "routes/recebimento.routes";
 import { startSchedulerLoop } from "./workers/scheduler";
 import { startConsumer } from "./workers/consumer-transfer";
-import "./service/telegram.service";
+
+
+import { startTelegram, stopTelegram } from "./service/telegram.service";
 
 dotenv.config();
 
@@ -125,22 +127,40 @@ async function bootstrap() {
   await app.register(async (r) => {
     r.addHook("onRequest", r.authenticate);
     r.register(movimentacoesRoutes);
-  })
+  });
+
+  await app.register(async (r) => {
+    r.addHook("onRequest", r.authenticate);
+    r.addHook("preHandler", r.rbac.requirePerm("stock:manage"));
+    r.register(recebimentoRoutes);
+  });
 
   await app.register(agendamentoRoutes);
-
   startConsumer();
   startSchedulerLoop();
+
+  app.addHook("onClose", async () => {
+    try { await stopTelegram(); } catch {}
+  });
 
   await app.ready();
   app.log.info(app.printRoutes());
 
+  let address: string;
   try {
-    const address = await app.listen({ port: PORT, host: HOST });
+    address = await app.listen({ port: PORT, host: HOST });
     app.log.info(`Servidor rodando em ${address}`);
   } catch (err) {
     app.log.error(err, "Erro ao iniciar o servidor");
     process.exit(1);
+    return;
+  }
+
+  try {
+    await startTelegram();
+    app.log.info("[telegram] startTelegram chamado");
+  } catch (e) {
+    app.log.error(e, "[telegram] falha ao iniciar");
   }
 }
 

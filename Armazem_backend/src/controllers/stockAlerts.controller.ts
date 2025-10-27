@@ -1,4 +1,3 @@
-// src/controllers/estoque-alertas.controller.ts
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 

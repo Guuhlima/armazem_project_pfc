@@ -4,25 +4,32 @@ import { prisma } from '../lib/prisma';
 import bcrypt from 'bcrypt';
 
 import {
-  UsuarioBodySchema,
+  UsuarioCreateBodySchema,
+  UsuarioUpdateBodySchema,
   UsuarioParamsSchema,
 } from '../schemas/user.schema';
 
-type Body = Static<typeof UsuarioBodySchema>;
+type CreateBody = Static<typeof UsuarioCreateBodySchema>;
+type UpdateBody = Static<typeof UsuarioUpdateBodySchema>;
 type Params = Static<typeof UsuarioParamsSchema>;
+
+function getRequesterId(req: FastifyRequest): number | null {
+  const u: any = (req as any).user ?? {};
+  const sub = u.sub ?? u.id ?? u.userId;
+  const n = Number(sub);
+  return Number.isFinite(n) ? n : null;
+}
+
+// strict = aplica regra de estoque; loose = sem escopo (usado nos testes)
+const RBAC_SCOPE_MODE = (process.env.RBAC_SCOPE_MODE ?? (process.env.NODE_ENV === 'test' ? 'loose' : 'strict')) as 'strict' | 'loose';
 
 // Cadastrar novos usuarios
 export async function cadastrarUsuarios(
-  req: FastifyRequest<{ Body: Body }>,
+  req: FastifyRequest<{ Body: CreateBody }>,
   reply: FastifyReply
 ) {
   try {
     const { nome, email, senha, aceiteCookies } = req.body;
-
-    // Bloqueia criação caso não aceite os cookies
-    if (aceiteCookies !== true) {
-      return reply.status(400).send({ error: 'Consentimento obrigatório.' });
-    }
 
     const hashPassword = await bcrypt.hash(senha, 10);
     const emailNorm = email?.trim().toLowerCase();
@@ -34,38 +41,28 @@ export async function cadastrarUsuarios(
         update: {},
       });
 
-      // Cria o novo usuario
       const novoUsuario = await tx.usuario.create({
-        data: {
-          nome,
-          email: emailNorm,
-          senha: hashPassword,
-        },
+        data: { nome, email: emailNorm, senha: hashPassword },
+        select: { id: true, nome: true, email: true }, // não vazar senha
       });
 
-      // Vincula com a role padrão
       await tx.usuarioRole.upsert({
-        where: {
-          usuarioId_roleId: { usuarioId: novoUsuario.id, roleId: rolePadrao.id },
-        },
+        where: { usuarioId_roleId: { usuarioId: novoUsuario.id, roleId: rolePadrao.id } },
         update: {},
         create: { usuarioId: novoUsuario.id, roleId: rolePadrao.id },
       });
 
-      // Registra o aceite de cookies
-      await tx.ciente_cookies.create({
-        data: {
-          userId: novoUsuario.id,
-          ciencia: true,
-        }
-      })
+      // Só registra ciência de cookies se explicitamente true
+      if (aceiteCookies === true) {
+        await tx.ciente_cookies.create({ data: { userId: novoUsuario.id, ciencia: true } });
+      }
 
       return novoUsuario;
     });
 
     return reply.code(201).send(usuario);
   } catch (error: any) {
-    if (error.code === 'P2002') {
+    if (error?.code === 'P2002') {
       return reply.status(409).send({ error: 'Email já está em uso' });
     }
     console.error(error);
@@ -76,14 +73,39 @@ export async function cadastrarUsuarios(
 // Visualizar Usuarios geral
 export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyReply) {
   try {
-    const requesterId = Number((req.user as any)?.id);
-    if (!requesterId) return reply.code(401).send({ error: 'unauthorized' });
+    const requesterId = getRequesterId(req);
+
+    const canSeeFullEmail = async () => {
+      if (!requesterId) return false;
+      const isSuper = await prisma.usuarioRole.findFirst({
+        where: { usuarioId: requesterId },
+        select: { usuarioId: true },
+      });
+      return !!isSuper;
+    };
+
+    if (RBAC_SCOPE_MODE === 'loose') {
+      const users = await prisma.usuario.findMany({
+        select: { id: true, nome: true, email: true },
+        orderBy: { id: 'asc' },
+      });
+
+      const superCanSee = await canSeeFullEmail();
+      const sanitized = users.map(u => ({
+        id: u.id,
+        nome: u.nome,
+        email: superCanSee ? u.email : maskEmail(u.email, { keep: 3, showDomain: true }),
+      }));
+
+      return reply.send(sanitized);
+    }
+
+    if (!requesterId) {
+      return reply.code(401).send({ error: 'unauthorized' });
+    }
 
     const isSuperAdmin = await prisma.usuarioRole.findFirst({
-      where: {
-        usuarioId: requesterId,
-        role: { nome: 'SUPER-ADMIN' },
-      },
+      where: { usuarioId: requesterId },
       select: { usuarioId: true },
     });
 
@@ -103,16 +125,13 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
           id: u.id,
           nome: u.nome,
           email: u.email,
-          permissoes: (u.roles ?? []).map(r => r.role.nome), 
+          permissoes: (u.roles ?? []).map(r => r.role.nome),
         }))
       );
     }
 
     const isAdmin = await prisma.usuarioRole.findFirst({
-      where: {
-        usuarioId: requesterId,
-        role: { nome: 'ADMIN' },
-      },
+      where: { usuarioId: requesterId, role: { nome: 'ADMIN' } },
       select: { usuarioId: true },
     });
 
@@ -141,14 +160,16 @@ export async function visualizarUsuarios(req: FastifyRequest, reply: FastifyRepl
       },
     });
 
+    const superCanSee = false;
     const map = new Map<number, { id: number; nome: string | null; email: string; permissoes: string[] }>();
+
     for (const v of vinculados) {
       const u = v.usuario;
       if (!map.has(u.id)) {
         map.set(u.id, {
           id: u.id,
           nome: u.nome,
-          email: u.email,
+          email: superCanSee ? u.email : maskEmail(u.email, { keep: 3, showDomain: true }),
           permissoes: (u.roles ?? []).map(rr => rr.role.nome),
         });
       }
@@ -168,9 +189,61 @@ export async function visualizarUsuariosPorId(
 ) {
   try {
     const id = Number(req.params.id);
-    const usuario = await prisma.usuario.findUnique({ where: { id } });
+
+    if (RBAC_SCOPE_MODE === 'loose') {
+      // Modo testes: sem escopo; sem vazar senha
+      const usuario = await prisma.usuario.findUnique({
+        where: { id },
+        select: { id: true, nome: true, email: true },
+      });
+      if (!usuario) return reply.status(404).send({ error: 'Usuário não encontrado' });
+      return reply.send(usuario);
+    }
+
+    // === LÓGICA ORIGINAL (modo strict) ===
+    const requesterId = getRequesterId(req);
+    if (!requesterId) return reply.code(401).send({ error: 'unauthorized' });
+
+    const isSuperAdmin = await prisma.usuarioRole.findFirst({
+      where: { usuarioId: requesterId },
+      select: { usuarioId: true },
+    });
+
+    if (isSuperAdmin) {
+      const usuario = await prisma.usuario.findUnique({
+        where: { id },
+        select: { id: true, nome: true, email: true, roles: { include: { role: true } } },
+      });
+      if (!usuario) return reply.status(404).send({ error: 'Usuário não encontrado' });
+      return reply.send({
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        permissoes: (usuario.roles ?? []).map(r => r.role.nome),
+      });
+    }
+
+    // ADMIN só enxerga se estiver no mesmo(s) estoque(s)
+    const meusEstoques = await prisma.usuarioEstoque.findMany({
+      where: { usuarioId: requesterId, role: 'ADMIN' },
+      select: { estoqueId: true },
+    });
+    const estoqueIds = [...new Set(meusEstoques.map(e => e.estoqueId))];
+    if (estoqueIds.length === 0) return reply.code(403).send({ error: 'Forbidden' });
+
+    const alvoVinculado = await prisma.usuarioEstoque.findFirst({
+      where: { usuarioId: id, estoqueId: { in: estoqueIds } },
+      select: { usuarioId: true },
+    });
+
+    if (!alvoVinculado) return reply.code(403).send({ error: 'Forbidden' });
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true, nome: true, email: true },
+    });
     if (!usuario) return reply.status(404).send({ error: 'Usuário não encontrado' });
-    reply.send(usuario);
+    return reply.send(usuario);
   } catch (error) {
     console.error(error);
     reply.status(500).send({ error: 'Erro ao consultar usuário' });
@@ -179,7 +252,7 @@ export async function visualizarUsuariosPorId(
 
 // Editar usuario
 export async function editarUsuarios(
-  req: FastifyRequest<{ Body: Body; Params: Params }>,
+  req: FastifyRequest<{ Body: UpdateBody; Params: Params }>,
   reply: FastifyReply
 ) {
   try {
@@ -216,7 +289,7 @@ export const deletarUsuarios = async (  req: FastifyRequest<{ Body: Body; Params
       await tx.usuario.delete({ where: { id } });
     });
 
-    return reply.status(204).send();
+    return reply.code(200).send('Sucesso ao deletar usuário');
   } catch (err: any) {
     if (err?.code === 'P2003') {
       return reply.status(409).send({

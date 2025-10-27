@@ -25,26 +25,22 @@ export default function Login() {
       const res = await apiAuth.post(
         '/user/login',
         { email, senha },
-        { withCredentials: true } // 👈 garante cookies HttpOnly, se usados
+        { withCredentials: true }
       );
 
       const { accessToken, refreshToken, token, user } = res.data || {};
       const at = accessToken ?? token;
       if (!at) throw new Error('Token não retornado pelo backend');
 
-      // Persiste tokens
       localStorage.setItem('accessToken', at);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       if (user) localStorage.setItem('user', JSON.stringify(user));
 
-      // Atualiza axios imediatamente (sem precisar recarregar)
       api.defaults.headers.common.Authorization = `Bearer ${at}`;
       apiAuth.defaults.headers.common.Authorization = `Bearer ${at}`;
 
-      // Notifica o app para refazer /user/me
       window.dispatchEvent(new Event('auth:changed'));
 
-      // Navega e força revalidação
       router.replace('/home');
       router.refresh();
     } catch (error: any) {
