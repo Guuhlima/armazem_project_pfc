@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.tsx
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
@@ -28,7 +27,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [perms, setPerms] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
 
-  /** Helpers */
   function setAxiosAuthHeader(token: string | null) {
     if (token) {
       api.defaults.headers.common.Authorization = `Bearer ${token}`;
@@ -54,7 +52,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  /** Public API do contexto */
   const reload = async () => {
     setReady(false);
     await fetchMe();
@@ -77,42 +74,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRoles([]);
       setPerms([]);
 
-      // notifica app e força novas fetches
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('auth:changed'));
       }
 
-      router.replace('/auth/login');
+      router.replace('/home');
       router.refresh();
     }
   };
 
   const hasPermission = (permOrRole: string | string[]) => {
     if (!ready) return false;
-    // SUPER-ADMIN libera tudo
     if (roles.includes('SUPER-ADMIN')) return true;
 
     const has = (s: string) =>
-      roles.includes(s) || perms.includes(s); // aceita tanto role code quanto permission code
+      roles.includes(s) || perms.includes(s); 
 
     if (Array.isArray(permOrRole)) return permOrRole.some(has);
     return has(permOrRole);
   };
 
-  /** Bootstrap do contexto */
   useEffect(() => {
     const at = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     setAxiosAuthHeader(at);
     if (at) fetchMe();
     else setReady(true);
 
-    // quando alguém faz login/logout e emite 'auth:changed', recarregamos o /me
     const onAuthChanged = () => reload();
     if (typeof window !== 'undefined') {
       window.addEventListener('auth:changed', onAuthChanged);
       return () => window.removeEventListener('auth:changed', onAuthChanged);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = useMemo(

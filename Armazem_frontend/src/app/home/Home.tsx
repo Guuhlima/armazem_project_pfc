@@ -5,13 +5,14 @@ import withAuth from '../components/withAuth';
 import api from '@/services/api';
 import Sidebar from '../components/Sidebar';
 import TableEquipamentos from '../components/TableEquipamentos';
-import { Card, CardContent } from '@/components/ui/card';
-import { PackageCheck, Plus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; 
+import { PackageCheck, Plus, Warehouse } from 'lucide-react'; 
 import { useRouter } from 'next/navigation';
 import { useMyWarehouses } from '@/hooks/useMyWarehouses';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Equipamento } from '@/types/equipamento';
 import { RequestWarehouseModal } from '../components/RequestWarehouseModal';
+import { Separator } from '@/components/ui/separator'; 
 
 type BackendEquip = {
   id: number;
@@ -19,7 +20,7 @@ type BackendEquip = {
   equipamento?: string | null;
   quantidade?: number | null;
   data?: string | Date | null;
-  warehouseId?: number | null; // útil no fallback
+  warehouseId?: number | null;
 };
 
 const Home = () => {
@@ -28,8 +29,7 @@ const Home = () => {
   const [openReq, setOpenReq] = useState(false);
 
   const router = useRouter();
-  const { logout } = useAuth();
-
+  const { logout, user } = useAuth(); // Pegar 'user' para mostrar o nome do usuário
   const { loading, isLinked, names, refresh, warehouses } = useMyWarehouses();
 
   const linkedWarehouseIds = useMemo(
@@ -43,10 +43,9 @@ const Home = () => {
   );
 
   useEffect(() => {
-    (async () => {
+     (async () => {
       try {
         if (loading) return;
-
         if (!isLinked || linkedWarehouseIds.length === 0) {
           setEquipamentos([]);
           return;
@@ -58,7 +57,7 @@ const Home = () => {
 
         const filtered = (Array.isArray(data) ? data : []).filter(item =>
           item?.warehouseId == null
-            ? true // se o back já filtrou, provavelmente nem vem esse campo
+            ? true
             : linkedWarehouseIds.includes(item.warehouseId!)
         );
 
@@ -87,85 +86,128 @@ const Home = () => {
     else setOpenReq(true);
   };
 
+  const userName = user?.nome?.split(' ')[0] ?? 'Usuário'; // Pega o primeiro nome do usuário
+
   return (
-    <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-900 dark:text-white transition-colors">
-      <Sidebar
-        onLogout={logout}
-        collapsed={collapsed}
-        onToggle={() => setCollapsed((v) => !v)}
+    <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-zinc-950 transition-colors">
+
+      <div
+        className="absolute inset-0 z-0 animate-pan-wireframe"
+        style={{
+          backgroundColor: 'transparent',
+          backgroundImage: `
+            repeating-linear-gradient(45deg,
+              rgba(59, 130, 246, 0.15) 0, rgba(59, 130, 246, 0.15) 1px,
+              transparent 1px, transparent 30px
+            ),
+            repeating-linear-gradient(-45deg,
+              rgba(59, 130, 246, 0.15) 0, rgba(59, 130, 246, 0.15) 1px,
+              transparent 1px, transparent 30px
+            )
+          `,
+          backgroundSize: '60px 60px',
+        }}
       />
 
-      <main className={`transition-all duration-300 p-6 pt-4 space-y-6 ${collapsed ? 'ml-16' : 'ml-60'}`}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm text-zinc-500">Total Equipamentos</h3>
-                <p className="text-2xl font-bold mt-1 text-blue-600">{equipamentos.length}</p>
-              </div>
-              <PackageCheck className="w-6 h-6 text-blue-500" />
-            </CardContent>
-          </Card>
+      <div className="relative z-10">
+        <Sidebar
+          onLogout={logout}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((v) => !v)}
+        />
 
-          <Card
-            onClick={() => router.push('/equipamento/create')}
-            className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow hover:cursor-pointer hover:shadow-lg transition"
-          >
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm text-zinc-500">Novo Equipamento</h3>
-                <p className="text-2xl font-bold mt-1 text-green-500">Criar</p>
-              </div>
-              <Plus className="w-6 h-6 text-green-500" />
-            </CardContent>
-          </Card>
+        <main className={`transition-all duration-300 p-6 pt-4 space-y-8 ${collapsed ? 'ml-16' : 'ml-60'}`}> 
 
-          <Card
-            onClick={handleCardClick}
-            className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow hover:cursor-pointer hover:shadow-lg transition"
-          >
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="text-sm text-zinc-500">Armazém</h3>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Dashboard
+            </h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Olá, {userName}! Visão geral do seu inventário.
+            </p>
+          </div>
+
+          <Separator className="bg-zinc-200 dark:bg-zinc-700/50" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"> 
+
+            <Card className="bg-white/90 dark:bg-zinc-900/70 backdrop-blur-sm border border-blue-500/10 dark:border-blue-500/20 shadow-sm hover:shadow-blue-500/10 hover:border-blue-500/30 transition-all duration-300 relative z-10">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Itens</CardTitle>
+                <PackageCheck className="w-5 h-5 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{equipamentos.length}</div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Equipamentos registrados</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              onClick={() => router.push('/equipamento/create')}
+              className="bg-white/90 dark:bg-zinc-900/70 backdrop-blur-sm border border-blue-500/10 dark:border-blue-500/20 shadow-sm hover:shadow-green-500/10 hover:border-green-500/30 transition-all duration-300 relative z-10 cursor-pointer group" 
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Novo Equipamento</CardTitle>
+                <Plus className="w-5 h-5 text-green-500 group-hover:scale-110 transition-transform" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-600 dark:text-green-500">Adicionar</div>
+              </CardContent>
+            </Card>
+
+            <Card
+              onClick={handleCardClick}
+              className={`bg-white/90 dark:bg-zinc-900/70 backdrop-blur-sm border border-blue-500/10 dark:border-blue-500/20 shadow-sm relative z-10 transition-all duration-300 ${isLinked ? 'hover:shadow-blue-500/10 hover:border-blue-500/30 cursor-pointer' : ''}`}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Meu Armazém</CardTitle>
+                <Warehouse className="w-5 h-5 text-zinc-500 dark:text-zinc-400"/>
+              </CardHeader>
+              <CardContent>
                 {loading ? (
-                  <div className="h-5 w-48 bg-zinc-200 dark:bg-zinc-700 animate-pulse rounded" />
+                  <div className="h-6 w-full bg-zinc-200 dark:bg-zinc-700 animate-pulse rounded mt-1" />
                 ) : isLinked ? (
-                  <p className="text-lg font-semibold truncate max-w-[16rem]" title={names}>
-                    {names}
-                  </p>
+                  <>
+                    <div className="text-xl font-semibold truncate text-zinc-900 dark:text-zinc-100" title={names}>
+                      {names}
+                    </div>
+                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Clique para ver detalhes</p>
+                  </>
                 ) : (
                   <>
-                    <p className="text-lg font-semibold">Não vinculado a um armazem</p>
+                    <div className="text-lg font-semibold text-orange-600 dark:text-orange-400">Não Vinculado</div>
                     <button
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1"
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenReq(true);
                       }}
                     >
-                      Solicitar acesso a armazem
+                      Solicitar acesso
                     </button>
                   </>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold mb-4">Últimos Equipamentos</h2>
-          {/* Evita “piscar” dados enquanto carrega os armazéns */}
-          <TableEquipamentos data={loading ? [] : equipamentos} />
-        </section>
-      </main>
+          <Separator className="bg-zinc-200 dark:bg-zinc-700/50" />
+
+          <section className="relative z-10">
+            <h2 className="text-xl font-semibold mb-4 tracking-tight text-zinc-900 dark:text-zinc-100">Inventário Rápido</h2>
+            <Card className="bg-white/90 dark:bg-zinc-900/70 backdrop-blur-sm border border-blue-500/10 dark:border-blue-500/20 shadow-sm">
+                <CardContent className="p-0"> 
+                    <TableEquipamentos data={loading ? [] : equipamentos} />
+                </CardContent>
+            </Card>
+          </section>
+        </main>
+      </div>
 
       <RequestWarehouseModal
         open={openReq}
         onClose={() => setOpenReq(false)}
-        onRequested={() => {
-          // após solicitar acesso, atualiza lista de armazéns vinculados
-          refresh();
-        }}
+        onRequested={refresh}
       />
     </div>
   );

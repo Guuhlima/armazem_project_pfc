@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, Mail, IdCard, Lock } from 'lucide-react';
+import { User, Mail, Lock, Package } from 'lucide-react'; 
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 
@@ -18,11 +18,12 @@ export default function Register() {
   const [confirmar, setConfirmar] = useState('');
   const [loading, setLoading] = useState(false);
 
+
   const abrirPoliticaPrivacidade = async () => {
     await Swal.fire({
       title: 'Política de Privacidade & Cookies',
       width: 800,
-      background: '#0b0b0b',
+      background: '#0b0b0b', 
       color: '#e5e7eb',
       showCloseButton: true,
       confirmButtonText: 'Fechar',
@@ -95,16 +96,15 @@ export default function Register() {
     });
   };
 
-  // Popup de consentimento (SweetAlert2) com link que abre a política
   const pedirConsentimento = async (): Promise<boolean> => {
     const { value: aceitou } = await Swal.fire({
       title: 'Termos & Cookies',
-      background: '#0b0b0b',
+      background: '#0b0b0b', 
       color: '#e5e7eb',
       html: `
         <div style="text-align:left">
           <p style="margin:0 0 8px">
-            Para criar sua conta, precisamos do seu consentimento quanto ao uso de cookies e ao tratamento de dados conforme nossa 
+            Para criar sua conta, precisamos do seu consentimento quanto ao uso de cookies e ao tratamento de dados conforme nossa 
             <button id="openPolicy" type="button" style="background:none;border:none;padding:0;margin:0;color:#60a5fa;cursor:pointer;text-decoration:underline">
               Política de Privacidade
             </button>.
@@ -154,17 +154,42 @@ export default function Register() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validação: Senhas não coincidem
     if (senha !== confirmar) {
-      alert('As senhas não coincidem.');
-      return;
+      Swal.fire({
+          title: 'Erro de Validação',
+          text: 'As senhas digitadas não coincidem. Por favor, verifique.',
+          icon: 'error',
+          timer: 2500,
+          showConfirmButton: false,
+          background: '#0b0b0b',
+          color: '#e5e7eb',
+          customClass: {
+              popup: 'rounded-xl'
+          }
+      });
+      return; 
     }
+
+    // Validação: Senha curta
     if (senha.length < 6) {
-      alert('A senha deve ter ao menos 6 caracteres.');
+      Swal.fire({
+          title: 'Senha Muito Curta',
+          text: 'Sua senha deve ter pelo menos 6 caracteres.',
+          icon: 'warning', 
+          timer: 2500,
+          showConfirmButton: false,
+          background: '#0b0b0b',
+          color: '#e5e7eb',
+          customClass: {
+              popup: 'rounded-xl'
+          }
+      });
       return;
     }
 
     const aceitou = await pedirConsentimento();
-    if (!aceitou) return;
+    if (!aceitou) return; 
 
     setLoading(true);
     try {
@@ -181,6 +206,8 @@ export default function Register() {
         icon: 'success',
         timer: 2000,
         showConfirmButton: false,
+        background: '#0b0b0b', 
+        color: '#e5e7eb'      
       });
 
       router.push('/home');
@@ -198,71 +225,132 @@ export default function Register() {
     }
   };
 
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-zinc-900 via-black to-zinc-800 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full max-w-md"
+    <main className="min-h-screen flex items-center justify-between p-16 relative overflow-hidden bg-zinc-900">
+      
+      <div 
+        className="absolute inset-0 z-0 animate-pan-grid"
+        style={{
+          backgroundColor: '#18181b',
+          backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.07) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }}
+      />
+
+      <motion.div 
+        className="flex flex-col z-10"
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
       >
-        <Card className="rounded-2xl shadow-2xl">
-          <CardContent className="p-8 space-y-6">
-            <h2 className="text-3xl font-bold text-center text-zinc-800 dark:text-white">Criar conta</h2>
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">Preencha seus dados para começar</p>
+        <div className="flex items-center gap-4">
+          <Package className="w-12 h-12 text-blue-500" />
+          <h1 className="text-5xl font-bold text-white">
+            Armazem Integrado <span className="text-blue-500">G3</span>
+          </h1>
+        </div>
+        <p className="text-xl text-zinc-400 mt-2 ml-[64px]">
+          Plataforma de Gestão de Estoque
+        </p>
+      </motion.div>
 
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  <User className="w-4 h-4" />
-                  Nome
-                </label>
-                <Input value={nome} onChange={(e) => setNome(e.target.value)} required />
-              </div>
+      
+      <motion.div
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut', delay: 0.4 }}
+        className="w-full max-w-md relative z-10" 
+      >
+        <Card className="rounded-2xl border border-zinc-700/50 bg-zinc-900/60 backdrop-blur-lg">
+          
+          <CardContent className="p-8"> 
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: 'easeOut', delay: 0.7 }} 
+              className="space-y-6" 
+            >
+              <h2 className="text-3xl font-bold text-center text-white">Criar conta</h2>
+              <p className="text-center text-sm text-zinc-400">Preencha seus dados para começar</p>
 
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  <Mail className="w-4 h-4" />
-                  Email
-                </label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
+                    <User className="w-4 h-4" />
+                    Nome
+                  </label>
+                  <Input 
+                    value={nome} 
+                    onChange={(e) => setNome(e.target.value)} 
+                    required 
+                    className="bg-transparent border-zinc-600 text-white placeholder:text-zinc-500"
+                  />
+                </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  <Lock className="w-4 h-4" />
-                  Senha
-                </label>
-                <Input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
-              </div>
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </label>
+                  <Input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    required 
+                    className="bg-transparent border-zinc-600 text-white placeholder:text-zinc-500"
+                  />
+                </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  <Lock className="w-4 h-4" />
-                  Confirmar senha
-                </label>
-                <Input type="password" value={confirmar} onChange={(e) => setConfirmar(e.target.value)} required />
-              </div>
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
+                    <Lock className="w-4 h-4" />
+                    Senha
+                  </label>
+                  <Input 
+                    type="password" 
+                    value={senha} 
+                    onChange={(e) => setSenha(e.target.value)} 
+                    required 
+                    className="bg-transparent border-zinc-600 text-white placeholder:text-zinc-500"
+                  />
+                </div>
 
-              <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                {loading ? 'Criando...' : 'Criar conta'}
-              </Button>
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
+                    <Lock className="w-4 h-4" />
+                    Confirmar senha
+                  </label>
+                  <Input 
+                    type="password" 
+                    value={confirmar} 
+                    onChange={(e) => setConfirmar(e.target.value)} 
+                    required 
+                    className="bg-transparent border-zinc-600 text-white placeholder:text-zinc-500"
+                  />
+                </div>
 
-              <p className="text-center text-xs text-zinc-500">
-                Ao prosseguir você concorda com nossa{' '}
-                <button
-                  type="button"
-                  onClick={abrirPoliticaPrivacidade}
-                  className="underline hover:opacity-80"
-                >
-                  Política de Privacidade & Cookies
-                </button>.
-              </p>
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? 'Criando...' : 'Criar conta'}
+                </Button>
 
-              <Button type="button" variant="ghost" className="w-full" onClick={() => router.push('/')}>
-                Já tenho conta
-              </Button>
-            </form>
+                <p className="text-center text-xs text-zinc-400"> 
+                  Ao prosseguir você concorda com nossa{' '}
+                  <button
+                    type="button"
+                    onClick={abrirPoliticaPrivacidade}
+                    className="underline hover:text-white" 
+                  >
+                    Política de Privacidade & Cookies
+                  </button>.
+                </p>
+
+                <Button type="button" variant="ghost" className="w-full text-zinc-300 hover:text-white" onClick={() => router.push('/')}>
+                  Já tenho conta
+                </Button>
+              </form>
+            </motion.div> 
           </CardContent>
         </Card>
       </motion.div>
