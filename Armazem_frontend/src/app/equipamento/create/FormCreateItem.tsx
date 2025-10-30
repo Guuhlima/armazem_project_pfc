@@ -94,9 +94,9 @@ const FormCreateItem = () => {
         return; 
     }
 
-    
     const equipmentPayload: any = {
         nome: data.nome,
+        quantidade: data.quantidade,
         ...(data.data && { data: data.data }),
     }; 
 
