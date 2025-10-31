@@ -17,15 +17,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ChevronRight, PackagePlus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useIsClient } from '@/hooks/useIsClient';
-
-interface Estoque {
-  id: number;
-  nome: string;
-}
+import { EstoqueProps, EquipamentoPayloadProps } from './interface';
 
 const FormCreateItem = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [estoques, setEstoques] = useState<Estoque[]>([]);
+  const [estoques, setEstoques] = useState<EstoqueProps[]>([]);
   const MySwal = withReactContent(Swal);
   const { hasPermission, logout } = useAuth();
   const isClient = useIsClient();
@@ -94,27 +90,15 @@ const FormCreateItem = () => {
         return; 
     }
 
-    const equipmentPayload: any = {
+    const equipmentPayload: EquipamentoPayloadProps = {
         nome: data.nome,
         quantidade: data.quantidade,
         ...(data.data && { data: data.data }),
     }; 
 
-    console.log("Payload para /equipment/cadastro:", JSON.stringify(equipmentPayload, null, 2)); 
-    if (data.vincularEstoque) {
-        console.log("Payload para /stockmovi/cadastro/...:", JSON.stringify({
-             itemId: 'Será preenchido após criar',
-             estoqueId: data.estoqueId,
-             quantidade: quantidade,
-             minimo: minimo
-         }, null, 2)); 
-    }
-
     try {
       // 1. Cria o equipamento base
-      console.log("Enviando para /equipment/cadastro..."); 
       const resEquip = await api.post('/equipment/cadastro', equipmentPayload); 
-      console.log("Resposta /equipment/cadastro:", resEquip); 
 
       const itemId = resEquip?.data?.id; 
       if (!itemId) {
@@ -126,9 +110,7 @@ const FormCreateItem = () => {
       if (data.vincularEstoque && data.estoqueId && quantidade >= 0 && minimo >= 0) {
         try {
           const stockPayload = { itemId: itemId, quantidade: quantidade, minimo: minimo };
-          console.log(`Enviando para /stockmovi/cadastro/${data.estoqueId}/adicionar-equipamento... Payload:`, JSON.stringify(stockPayload, null, 2)); // Adicionado ;
           await api.post(`/stockmovi/cadastro/${data.estoqueId}/adicionar-equipamento`, stockPayload);
-          console.log("Vínculo com estoque bem-sucedido.");
         } catch (err: any) {
           console.error('Erro DETALHADO ao vincular ao estoque:', err.response?.data || err.message); 
           await MySwal.fire({
@@ -154,7 +136,7 @@ const FormCreateItem = () => {
       }); 
       reset();
 
-    } catch (err: any) { // Catch geral
+    } catch (err: any) {
       console.error("Erro ao cadastrar:", err.response?.data || err.message); 
       const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Erro desconhecido ao cadastrar equipamento.'; 
       await MySwal.fire({
