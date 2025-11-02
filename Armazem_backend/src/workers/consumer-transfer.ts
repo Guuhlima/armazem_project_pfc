@@ -60,15 +60,12 @@ async function processar(p: any) {
   });
   const itemNome = (item?.nome ?? '').trim() || `Item#${itemId}`;
 
-  // 1) marca início (SENT) — não usa método Telegram inexistente
+  // 1) marca início (SENT) 
   if (ag.status !== 'SENT') {
     await prisma.transferenciaAgendada.update({
       where: { id: jobId },
       data: { status: 'SENT', tentativas: { increment: 1 }, erroUltimaTentativa: null },
     }).catch(() => {});
-    // Se quiser notificar início: crie um método no TelegramService,
-    // ex.: TelegramService.sendAgendamentoStartNotification(...).
-    // Por ora, seguimos sem notificar aqui para evitar o erro de método inexistente.
   }
 
   try {
@@ -120,8 +117,6 @@ async function processar(p: any) {
       where: { id: jobId },
       data: { status: 'FAILED', erroUltimaTentativa: e?.message ?? 'erro' },
     }).catch(() => {});
-    // Opcional: se tiver um método pronto, chame aqui.
-    // try { await TelegramService.sendAgendamentoFailedNotification({...}); } catch {}
-    throw e; // deixa o caller reenfileirar (retry)
+    throw e;
   }
 }

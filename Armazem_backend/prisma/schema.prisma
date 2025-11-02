@@ -38,6 +38,27 @@ enum RastreioTipo {
   SERIAL
 }
 
+enum AbcClasses {
+  A
+  B
+  C
+}
+
+enum CountStatus {
+  PENDING
+  IN_PROGRESS
+  RECOUNT_REQUIRED
+  CLOSED
+  CANCELED
+}
+
+enum DiscrepancyResolution {
+  WITHIN_TOLERANCE
+  ADJUSTED
+  RECOUNT_CLOSED
+}
+
+
 model Usuario {
   id                 Int     @id @default(autoincrement())
   nome               String? @db.VarChar(255)
@@ -76,6 +97,7 @@ model Equipamento {
   estoqueItens   EstoqueItem[]
   agendamentos   TransferenciaAgendada[]
 
+  contagemTarefa        ContagemCiclicaTarefa[]
   rastreioTipo   RastreioTipo      @default(NONE)
 
   lotes          Lote[]
@@ -93,9 +115,9 @@ model Lote {
   validade   DateTime?  @db.Date
   createdAt  DateTime   @default(now())
 
+  contagemTarefa        ContagemCiclicaTarefa[]
   item       Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
   seriais    Serial[]
-  // Movimentações por lote
   movimentos MovEstoque[]
 
   @@unique([itemId, codigo], name: "unique_lote_por_item")
@@ -110,6 +132,7 @@ model Serial {
   loteId     Int?       
   createdAt  DateTime   @default(now())
 
+  contagemTarefa        ContagemCiclicaTarefa[]
   item       Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
   lote       Lote?       @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
@@ -168,13 +191,14 @@ model Estoque {
   transferenciasOrigem  Transferencia[] @relation("TransferenciasOrigem")
   itens                 EstoqueItem[]
 
-  agendamentosOrigem  TransferenciaAgendada[] @relation("AgendamentoOrigem") // ← novo
-  agendamentosDestino TransferenciaAgendada[] @relation("AgendamentoDestino") // ← novo
+  agendamentosOrigem  TransferenciaAgendada[] @relation("AgendamentoOrigem")
+  agendamentosDestino TransferenciaAgendada[] @relation("AgendamentoDestino")
 
   movimentosOrigem  MovEstoque[] @relation("MovOrigem")
   movimentosDestino MovEstoque[] @relation("MovDestino")
 
-
+  contagemTarefa        ContagemCiclicaTarefa[]
+  contagemCiclica       ContagemCiclicaPolitica[]
   usuarios              UsuarioEstoque[]
   estoqueTelegramNotify EstoqueTelegramNotify[]
   requests              StockAccessRequest[]
@@ -256,6 +280,9 @@ model EstoqueItem {
   autoAtivo        Boolean     @default(false)
   origemPreferidaId Int?
   leadTimeDias     Int?
+  classeAbc      AbcClasses?
+  lastCountedAt  DateTime?
+  nextCountDueAt DateTime?
 
   estoque     Estoque     @relation(fields: [estoqueId], references: [id])
   item        Equipamento @relation(fields: [itemId], references: [id])
@@ -400,4 +427,77 @@ model MovimentacaoEstoque {
   quantidade   Int
   referenciaId Int?
   createdAt    DateTime @default(now())
+}
+
+model ContagemCiclicaPolitica {
+  id           Int       @id @default(autoincrement())
+  estoqueId    Int
+  itemId       Int?
+  classeAbc    AbcClasses?
+  frequenciaDias Int
+  toleranciaPct  Float
+  contagemDupla  Boolean @default(true)
+  bloquearMov    Boolean @default(true)
+  ativa          Boolean @default(true)
+
+  contagemTarefa        ContagemCiclicaTarefa[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  estoque      Estoque   @relation(fields: [estoqueId], references: [id])
+
+  @@index([estoqueId, ativa])
+  @@index([classeAbc])
+  @@unique([estoqueId, itemId, classeAbc], name: "politica_scope_unique")
+  @@map("contagem_politicas")
+}
+
+model ContagemCiclicaTarefa {
+  id              Int         @id @default(autoincrement())
+  estoqueId       Int
+  itemId          Int
+  loteId          Int?
+  serialId        Int?
+  status          CountStatus @default(PENDING)
+  dueAt           DateTime
+  startedAt       DateTime?
+  closedAt        DateTime?
+
+  politicaId      Int?
+  toleranciaPct   Float?
+  contagemDupla   Boolean?
+  bloquearMov     Boolean?
+
+  systemQtyAtStart Int?
+  finalQty         Int?
+  resolution       DiscrepancyResolution?
+  ajusteMovId      Int? 
+
+  createdById     Int?
+  closedById      Int?
+
+  estoque         Estoque     @relation(fields: [estoqueId], references: [id])
+  item            Equipamento @relation(fields: [itemId], references: [id])
+  lote            Lote?       @relation(fields: [loteId], references: [id])
+  serial          Serial?     @relation(fields: [serialId], references: [id])
+  politica        ContagemCiclicaPolitica? @relation(fields: [politicaId], references: [id])
+  lancamentos     ContagemCiclicaLancamento[]
+
+  @@index([estoqueId, itemId, status, dueAt])
+  @@map("contagem_tarefas")
+}
+
+model ContagemCiclicaLancamento {
+  id           Int      @id @default(autoincrement())
+  tarefaId     Int
+  tentativa    Int 
+  quantidade   Int
+  contadoPorId Int?
+  contadoEm    DateTime @default(now())
+
+  tarefa       ContagemCiclicaTarefa @relation(fields: [tarefaId], references: [id])
+
+  @@unique([tarefaId, tentativa])
+  @@index([contadoEm])
+  @@map("contagem_lancamentos")
 }
