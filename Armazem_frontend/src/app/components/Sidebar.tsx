@@ -90,7 +90,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         {hasPermission('transfer:manage') && (
           <Link href="/transfer" className={navItem(pathname, '/transfer')}>
             <Repeat className="w-4 h-4" />
-            {!collapsed && 'Transferência'}
+            {!collapsed && 'Gestão de armazem'}
           </Link>
         )}
 
