@@ -24,10 +24,10 @@ import { adminUserStockRoutes } from "./routes/adminUserStock.routes";
 import { agendamentoRoutes } from "./routes/agendamento.routes";
 import { movimentacoesRoutes } from "routes/movimentacoes.routes";
 import { recebimentoRoutes } from "routes/recebimento.routes";
+import { contagemRoutes } from "routes/contagem.routes";
 import { startSchedulerLoop } from "./workers/scheduler";
 import { startConsumer } from "./workers/consumer-transfer";
-
-
+import { startCyclicCountWorker } from "./workers/contagem-ciclica.worker";
 import { startTelegram, stopTelegram } from "./service/telegram.service";
 
 dotenv.config();
@@ -135,12 +135,20 @@ async function bootstrap() {
     r.register(recebimentoRoutes);
   });
 
+  await app.register(async (r) => {
+    r.addHook("onRequest", r.authenticate);
+    r.register(contagemRoutes);
+  });
+
   await app.register(agendamentoRoutes);
   startConsumer();
   startSchedulerLoop();
+  startCyclicCountWorker();
 
   app.addHook("onClose", async () => {
-    try { await stopTelegram(); } catch {}
+    try {
+      await stopTelegram();
+    } catch {}
   });
 
   await app.ready();

@@ -28,7 +28,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// (Opcional) Auto-refresh em 401
 let isRefreshing = false;
 let queue: Array<(t: string | null) => void> = [];
 const notifyAll = (t: string | null) => { queue.forEach((cb) => cb(t)); queue = []; };
@@ -84,5 +83,4 @@ api.interceptors.response.use(
   }
 );
 
-/** Default export para compatibilidade com `import api from` */
 export default api;

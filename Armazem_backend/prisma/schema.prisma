@@ -462,7 +462,7 @@ model ContagemCiclicaTarefa {
   dueAt           DateTime
   startedAt       DateTime?
   closedAt        DateTime?
-
+  cancelReason    String?     @db.VarChar(255)
   politicaId      Int?
   toleranciaPct   Float?
   contagemDupla   Boolean?
