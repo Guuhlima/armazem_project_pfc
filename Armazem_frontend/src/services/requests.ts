@@ -29,7 +29,6 @@ export async function rejectRequest(id: number) {
   return data;
 }
 
-// (opcional) listar pendentes para a página de lista
 export async function listRequests(status: 'PENDING' | 'APPROVED' | 'REJECTED' = 'PENDING') {
   const { data } = await api.get('/requests', { params: { status } });
   return data as AccessRequest[];
