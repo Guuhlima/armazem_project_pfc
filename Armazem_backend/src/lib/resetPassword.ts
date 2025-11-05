@@ -28,6 +28,6 @@ export async function sendEmail(to: string, resetLink: string) {
         text: `Para trocar sua senha, acesse: ${resetLink}`,
         html: `<p>Para trocar sua senha, clique</p>
                <p><a href="${resetLink}">${resetLink}</a></p>
-               <p>Se você não solicitou, ignore esté email.</p>`,
+               <p>Se você não solicitou, ignore este email.</p>`,
     });
 }

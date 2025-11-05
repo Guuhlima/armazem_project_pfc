@@ -17,11 +17,16 @@ module.exports = {
             '0%': { backgroundPosition: '0 0' },
             '100%': { backgroundPosition: '-1000px -1000px' },
           },
+          'neon-grid': {
+            '0%': { backgroundPosition: '0 0' },
+            '100%': { backgroundPosition: '60px 0' }, 
+          },
         },
         animation: {
           'pan-grid': 'pan-grid 3s linear infinite',
           'pan-wireframe': 'pan-wireframe 15s linear infinite',
           'starfield': 'starfield 120s linear infinite', 
+          'neon-grid': 'neon-grid 8s linear infinite', 
         },
         borderRadius: {
             lg: 'var(--radius)',

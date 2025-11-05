@@ -47,7 +47,8 @@ export function RequestWarehouseModal({ open, onClose, onRequested, excludeIds =
         text: 'Solicitação enviada para aprovação do admin do armazém',
         timer: 1500
       })
-      // alert('Solicitação enviada para aprovação do admin do armazém.');
+      // Solicitação enviada para aprovação do admin do armazém;
+      
     } catch (e: any) {
       alert(e?.response?.data?.error || 'Erro ao solicitar acesso');
     } finally {
@@ -82,7 +83,7 @@ export function RequestWarehouseModal({ open, onClose, onRequested, excludeIds =
               value={estoqueId}
               onChange={(e) => setEstoqueId(e.target.value ? Number(e.target.value) : '')}
             >
-              <option value="">— selecione —</option>
+              <option value="">— Selecione —</option>
               {options.map(s => (
                 <option key={s.id} value={s.id}>{s.nome}</option>
               ))}

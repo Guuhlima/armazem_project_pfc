@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import TransferForm from "./create/TransferForm";
 import CreateEstoqueForm from "./create-estoque/CreateEstoqueForm";
 import ListEstoqueForm from "./list-estoque/ListarEstoque";
@@ -8,7 +9,7 @@ import Sidebar from "../components/Sidebar";
 import RecebimentoForm from "./create-recebimento/RecebimentoForm";
 import SaidaForm from "./create-saida/SaidaForm";
 import ContagensPage from "./contagem-ciclica/contagem";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -18,9 +19,12 @@ import {
   ArrowLeft,
   ChevronRight,
   PackageMinus,
+  LayoutGrid,
 } from "lucide-react";
 import withAuth from "app/components/withAuth";
 import { AnimatePresence, motion } from "framer-motion";
+import { Separator } from '@/components/ui/separator'; 
+import { useIsClient } from '@/hooks/useIsClient'; 
 
 type View =
   | "inicio"
@@ -49,28 +53,29 @@ function ActionCard({
   return (
     <motion.button
       onClick={onClick}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.985 }}
-      className="group w-full text-left rounded-2xl border border-border bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition"
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      className="group w-full text-left rounded-xl shadow-xl transition
+                 bg-card/90 dark:bg-zinc-900/85 backdrop-blur-lg 
+                 border border-border dark:border-blue-800/50 
+                 hover:border-blue-500/50 dark:hover:border-blue-600/70" 
       aria-label={title}
     >
-      <Card className="border-0 bg-transparent">
-        <CardContent className="p-5 md:p-6 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {subtitle}
-            </p>
-            <h3 className="mt-1 text-lg font-semibold">{title}</h3>
-            <div className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <span>Abrir</span>
-              <ChevronRight className="w-3.5 h-3.5 transition group-hover:translate-x-0.5" />
-            </div>
+      <CardContent className="p-5 md:p-6 flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {subtitle}
+          </p>
+          <h3 className="mt-1 text-lg font-semibold text-foreground">{title}</h3>
+          <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary"> 
+            <span>Abrir</span>
+            <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </div>
-          <div className="shrink-0 rounded-xl p-3 bg-accent text-accent-foreground ring-1 ring-border/60">
-            {icon}
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="shrink-0 rounded-lg p-3 bg-gradient-to-br from-blue-500/10 to-transparent dark:from-blue-800/20 dark:to-transparent text-primary ring-1 ring-border/60">
+          {icon}
+        </div>
+      </CardContent>
     </motion.button>
   );
 }
@@ -86,10 +91,10 @@ function Segmented({
     <button
       onClick={() => setView(v)}
       className={[
-        "px-3 py-1.5 text-sm rounded-md transition",
+        "px-3 py-1.5 text-xs sm:text-sm rounded-md transition-colors",
         view === v
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-muted",
+          ? "bg-primary text-primary-foreground shadow-sm" 
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
       ].join(" ")}
       aria-pressed={view === v}
     >
@@ -97,14 +102,14 @@ function Segmented({
     </button>
   );
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-card/60 p-1">
+    <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border dark:border-zinc-700/50 bg-card/90 dark:bg-zinc-900/70 backdrop-blur-sm p-1">
       {btn("inicio", "Início")}
-      {btn("criarEstoque", "Criar estoque")}
-      {btn("listarEstoques", "Estoques")}
+      {btn("criarEstoque", "Criar")}
+      {btn("listarEstoques", "Listar")}
       {btn("novaTransferencia", "Transferir")}
       {btn("novoRecebimento", "Receber")}
-      {btn("novaSaida", "Sair (Fefo/Serial)")}
-      {btn("contagemCiclica", "Contagem cíclica")}
+      {btn("novaSaida", "Saída")}
+      {btn("contagemCiclica", "Contagem")}
     </div>
   );
 }
@@ -112,222 +117,138 @@ function Segmented({
 const TransferDashboardPage = () => {
   const [view, setView] = useState<View>("inicio");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { user } = useAuth();
-  const handleLogout = () => {
-    localStorage.removeItem("auth");
-    window.location.href = "/";
+  const { logout } = useAuth(); 
+  const isClient = useIsClient();
+
+  if (!isClient) return null; 
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  const viewTitles: Record<View, string> = {
+      inicio: "Painel de Transferências",
+      criarEstoque: "Criar Novo Estoque",
+      listarEstoques: "Estoques Cadastrados",
+      novaTransferencia: "Nova Transferência",
+      novoRecebimento: "Novo Recebimento",
+      novaSaida: "Nova Saída de Itens",
+      contagemCiclica: "Contagem Cíclica de Inventário"
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors">
+    <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
+      
+      <div
+        className="fixed inset-0 z-0 animate-neon-grid"
+        style={{
+          backgroundColor: 'transparent',
+          backgroundImage: `
+            linear-gradient(rgba(200, 200, 200, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(200, 200, 200, 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '30px 30px',
+        }}
+      >
+        <div 
+          className="absolute inset-0 hidden dark:block"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(29, 78, 216, 0.2) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(29, 78, 216, 0.2) 1px, transparent 1px)
+            `,
+            backgroundSize: '30px 30px',
+            boxShadow: 'inset 0 0 100px 50px rgba(29, 78, 216, 0.15)',
+          }}
+        />
+      </div>
+
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onLogout={handleLogout}
+        onLogout={handleLogout} 
       />
 
       <main
-        className={`transition-all duration-300 p-4 md:p-6 ${
-          sidebarCollapsed ? "ml-16" : "ml-60"
+        className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${
+          sidebarCollapsed ? "ml-16" : "ml-64"
         }`}
         role="main"
       >
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {view !== "inicio" && (
+              <nav className="flex items-center text-sm text-muted-foreground mb-1">
+                {view !== "inicio" ? (
                   <>
                     <button
                       onClick={() => setView("inicio")}
-                      className="inline-flex items-center gap-1 hover:text-foreground transition"
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                      Voltar
+                      Painel
                     </button>
-                    <span>/</span>
+                    <ChevronRight className="w-4 h-4 mx-1 text-muted-foreground/50" />
+                    <span className="font-medium text-primary">{viewTitles[view]}</span>
                   </>
+                ) : (
+                   <span className="font-medium text-primary flex items-center gap-2">
+                       <LayoutGrid className="w-4 h-4" /> Painel de Transferências
+                   </span>
                 )}
-                <span>Painel</span>
-              </div>
-              <h1 className="mt-1 text-2xl md:text-3xl font-bold">
-                Transferências
+              </nav>
+              <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+                {viewTitles[view]}
               </h1>
-              <p className="text-sm text-muted-foreground">
-                Crie estoques, visualize existentes e realize ou agende
-                transferências.
-              </p>
+              {view === "inicio" && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Selecione uma ação para gerenciar seus estoques e movimentações.
+                </p>
+              )}
             </div>
-            <Segmented view={view} setView={setView} />
+            <div className="w-full md:w-auto">
+                <Segmented view={view} setView={setView} />
+            </div>
           </div>
+
+          <Separator className="bg-border/50" />
 
           <AnimatePresence mode="wait">
             {view === "inicio" && (
               <motion.section
                 key="inicio"
-                initial={enter}
-                animate={center}
-                exit={exit}
+                initial={enter} animate={center} exit={exit}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
               >
-                <ActionCard
-                  title="Criar estoque"
-                  subtitle="Novo"
-                  icon={<PlusCircle className="w-6 h-6" />}
-                  onClick={() => setView("criarEstoque")}
-                />
-                <ActionCard
-                  title="Estoques existentes"
-                  subtitle="Consultar"
-                  icon={<Boxes className="w-6 h-6" />}
-                  onClick={() => setView("listarEstoques")}
-                />
-                <ActionCard
-                  title="Nova transferência"
-                  subtitle="Operação"
-                  icon={<Repeat className="w-6 h-6" />}
-                  onClick={() => setView("novaTransferencia")}
-                />
-                <ActionCard
-                  title="Novo recebimento"
-                  subtitle="Entrada"
-                  icon={<PlusCircle className="w-6 h-6" />}
-                  onClick={() => setView("novoRecebimento")}
-                />
-                <ActionCard
-                  title="Nova saída"
-                  subtitle="Operação"
-                  icon={<PackageMinus className="w-6 h-6" />}
-                  onClick={() => setView("novaSaida")}
-                />
-                <ActionCard
-                  title="Contagem cíclica"
-                  subtitle="Inventário rotativo"
-                  icon={<Boxes className="w-6 h-6" />}
-                  onClick={() => setView("contagemCiclica")}
-                />
+                <ActionCard title="Criar estoque" subtitle="Novo" icon={<PlusCircle className="w-6 h-6" />} onClick={() => setView("criarEstoque")} />
+                <ActionCard title="Estoques existentes" subtitle="Consultar" icon={<Boxes className="w-6 h-6" />} onClick={() => setView("listarEstoques")} />
+                <ActionCard title="Nova transferência" subtitle="Operação" icon={<Repeat className="w-6 h-6" />} onClick={() => setView("novaTransferencia")} />
+                <ActionCard title="Novo recebimento" subtitle="Entrada" icon={<PlusCircle className="w-6 h-6" />} onClick={() => setView("novoRecebimento")} />
+                <ActionCard title="Nova saída" subtitle="Operação" icon={<PackageMinus className="w-6 h-6" />} onClick={() => setView("novaSaida")} />
+                <ActionCard title="Contagem cíclica" subtitle="Inventário rotativo" icon={<Boxes className="w-6 h-6" />} onClick={() => setView("contagemCiclica")} />
               </motion.section>
             )}
 
-            {view === "criarEstoque" && (
+            {view !== "inicio" && (
               <motion.section
-                key="criar"
-                initial={enter}
-                animate={center}
-                exit={exit}
+                key={view}
+                initial={enter} animate={center} exit={exit}
               >
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">
-                      Criar novo estoque
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Defina nome e configurações iniciais do estoque.
-                    </p>
-                  </div>
-                  <CreateEstoqueForm />
-                </div>
-              </motion.section>
-            )}
-
-            {view === "listarEstoques" && (
-              <motion.section
-                key="listar"
-                initial={enter}
-                animate={center}
-                exit={exit}
-              >
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">Estoques</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Consulte os estoques cadastrados e seus itens.
-                    </p>
-                  </div>
-                  <ListEstoqueForm />
-                </div>
-              </motion.section>
-            )}
-
-            {view === "novaTransferencia" && (
-              <motion.section
-                key="transferir"
-                initial={enter}
-                animate={center}
-                exit={exit}
-              >
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">
-                      Nova transferência
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Selecione origem, item, destino e quantidade. Você pode
-                      agendar a execução.
-                    </p>
-                  </div>
-                  <TransferForm />
-                </div>
-              </motion.section>
-            )}
-
-            {view === "novoRecebimento" && (
-              <motion.section
-                key="receber"
-                initial={enter}
-                animate={center}
-                exit={exit}
-              >
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">Novo recebimento</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Lance entradas no estoque por item, lote/validade e serial
-                      (quando aplicável).
-                    </p>
-                  </div>
-                  <RecebimentoForm />
-                </div>
-              </motion.section>
-            )}
-
-            {view === "novaSaida" && (
-              <motion.section
-                key="saida"
-                initial={enter}
-                animate={center}
-                exit={exit}
-              >
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">Nova saída</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Retire itens por FEFO (lote) ou por serial quando
-                      aplicável.
-                    </p>
-                  </div>
-                  <SaidaForm />
-                </div>
-              </motion.section>
-            )}
-
-            {view === "contagemCiclica" && (
-              <motion.section
-                key="contagem"
-                initial={enter}
-                animate={center}
-                exit={exit}
-              >
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">Contagem cíclica</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Liste tarefas, inicie e lance contagens/recontagens.
-                    </p>
-                  </div>
-                  <ContagensPage />
-                </div>
+                <Card className="w-full bg-card/90 dark:bg-card/85 backdrop-blur-lg border border-border dark:border-blue-800/50 shadow-xl rounded-xl overflow-hidden">
+                  <CardHeader className="p-6 border-b border-border dark:border-blue-800/40">
+                    <CardTitle className="text-xl font-semibold text-foreground">
+                      {viewTitles[view]}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6">
+                    {view === "criarEstoque" && <CreateEstoqueForm />}
+                    {view === "listarEstoques" && <ListEstoqueForm />}
+                    {view === "novaTransferencia" && <TransferForm />}
+                    {view === "novoRecebimento" && <RecebimentoForm />}
+                    {view === "novaSaida" && <SaidaForm />}
+                    {view === "contagemCiclica" && <ContagensPage />}
+                  </CardContent>
+                </Card>
               </motion.section>
             )}
           </AnimatePresence>
@@ -336,9 +257,10 @@ const TransferDashboardPage = () => {
             <div className="flex justify-center pt-2">
               <Button
                 variant="ghost"
-                className="text-primary"
+                className="text-primary hover:text-primary/90"
                 onClick={() => setView("inicio")}
               >
+                <ArrowLeft className="w-4 h-4 mr-2" />
                 Voltar ao menu principal
               </Button>
             </div>

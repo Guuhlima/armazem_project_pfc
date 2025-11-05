@@ -1,175 +1,211 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useAgendamentos } from '../../hooks/useAgendamento';
-import { cancelAgendamento } from '../../services/repoauto';
+'use client';
 
-const Badge = ({ s }: { s: string }) => {
-  const color: Record<string,string> = {
-    PENDING:'#b58900', EXECUTED:'#268bd2', DONE:'#2aa198', FAILED:'#dc322f', CANCELED:'#657b83'
-  };
-  return (
-    <span
-      style={{
-        padding:'2px 6px',
-        borderRadius:12,
-        background:color[s]||'#777',
-        color:'#fff',
-        fontSize:12
-      }}
-    >
-      {s}
-    </span>
-  );
-};
+import { useEffect, useState, useMemo } from 'react';
+import api from '@/services/api';
+import { Button } from '@/components/ui/button';
+import { Loader2, Trash2, CalendarX, Info } from 'lucide-react';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+import { useAuth } from '@/contexts/AuthContext';
+import { useIsClient } from '@/hooks/useIsClient'; 
 
-interface AgendamentosTableProps {
-  refreshKey?: number;
+// Tipos e Estilos
+interface Agendamento {
+  id: number;
+  itemId: number;
+  estoqueOrigemId: number;
+  estoqueDestinoId: number;
+  quantidade: number;
+  executarEm: string;
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELED" | "FAILED";
+  item?: { nome: string };
+  estoqueOrigem?: { nome: string };
+  estoqueDestino?: { nome: string };
+  erroUltimaTentativa?: string | null;
 }
 
-export function AgendamentosTable({ refreshKey }: AgendamentosTableProps) {
-  const { data, loading, error, reload } = useAgendamentos();
-  const [status, setStatus] = useState<'ALL'|'PENDING'|'EXECUTED'|'DONE'|'FAILED'|'CANCELED'>('ALL');
-  const [origem, setOrigem] = useState<'ALL'|'AUTO'|'MANUAL'>('ALL');
+// Estilos dos Badges de Status 
+const STATUS_STYLES: Record<Agendamento["status"], string> = {
+  PENDING: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50",
+  PROCESSING: "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50",
+  COMPLETED: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border border-green-200 dark:border-green-700/50",
+  CANCELED: "bg-zinc-100 text-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700/50",
+  FAILED: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border border-red-200 dark:border-red-700/50",
+};
 
-  // loading por linha
-  const [executingId, setExecutingId] = useState<number | null>(null);
-  const [cancelingId, setCancelingId] = useState<number | null>(null);
+const MySwal = withReactContent(Swal);
 
-  // quando o refreshKey mudar (vindo da página), recarrega
-  useEffect(() => {
-    reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]);
-
-  const filtered = useMemo(
-    () =>
-      data.filter(
-        (a) =>
-          (status === 'ALL' || a.status === status) &&
-          (origem === 'ALL' || (a.origemTipo ?? 'MANUAL') === origem)
-      ),
-    [data, status, origem]
-  );
-
-  async function cancel(id: number) {
+// Helper para formatar data
+function formatarDataHora(dataStr: string) {
     try {
-      setCancelingId(id);
-      await cancelAgendamento(id);
-      reload();
-    } catch (e: any) {
-      alert(e?.message || 'Falha ao cancelar');
+        return new Intl.DateTimeFormat('pt-BR', {
+            dateStyle: 'short', timeStyle: 'short',
+        }).format(new Date(dataStr));
+    } catch { return 'Data inválida'; }
+}
+
+// Componente da Tabela
+export function AgendamentosTable({ refreshKey }: { refreshKey: number }) {
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { hasPermission } = useAuth();
+  const isClient = useIsClient(); 
+
+  // Função para recarregar os dados
+  async function refreshAgendamentos() {
+    setLoading(true);
+    try {
+      const res = await api.get("/agendamentos?include=item,estoqueOrigem,estoqueDestino");
+      setAgendamentos(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error("Erro ao listar agendamentos", e);
+      setAgendamentos([]);
     } finally {
-      setCancelingId(null);
+      setLoading(false);
     }
   }
 
-  async function executar(id: number) {
-    try {
-      setExecutingId(id);
-      const token = localStorage.getItem('token') || '';
-      const API = process.env.NEXT_PUBLIC_API_URL!;
-      const res = await fetch(`${API}/agendamentos/${id}/executar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Erro ao executar agendamento');
-      // opcional: feedback
-      alert(`Agendamento #${id} executado!`);
-      reload();
-    } catch (e: any) {
-      alert(e?.message || 'Falha ao executar agendamento');
-    } finally {
-      setExecutingId(null);
+  // Recarrega quando a 'refreshKey' ou 'isClient' mudam
+  useEffect(() => {
+    if (isClient) { 
+      refreshAgendamentos();
     }
+  }, [refreshKey, isClient]); 
+
+  // Função para cancelar agendamento 
+  async function cancelarAgendamento(id: number) {
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
+    const result = await MySwal.fire({
+        title: 'Tem certeza?',
+        text: `Deseja realmente cancelar o agendamento ID: ${id}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, cancelar!',
+        cancelButtonText: 'Não',
+        confirmButtonColor: '#dc2626', 
+        background: isDarkMode ? '#0b0b0b' : '#fff',
+        color: isDarkMode ? '#e5e7eb' : '#18181b',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await api.delete(`/agendamentos/${id}`);
+      await refreshAgendamentos(); // Recarrega a lista
+      MySwal.fire({
+          icon: 'success', title: 'Cancelado',
+          text: 'Agendamento cancelado com sucesso.',
+          timer: 2000, showConfirmButton: false,
+          background: isDarkMode ? '#0b0b0b' : '#fff',
+          color: isDarkMode ? '#e5e7eb' : '#18181b',
+      });
+    } catch (e: any) {
+      MySwal.fire({
+          icon: 'error', title: 'Erro!',
+          text: e?.response?.data?.error || "Erro ao cancelar agendamento",
+          background: isDarkMode ? '#0b0b0b' : '#fff',
+          color: isDarkMode ? '#e5e7eb' : '#18181b',
+      });
+    }
+  }
+  
+  // Estado de Loading
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 text-muted-foreground h-40">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        <span>Carregando agendamentos...</span>
+      </div>
+    );
+  }
+
+  // Estado Vazio
+  if (agendamentos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center py-12 text-muted-foreground">
+        <CalendarX className="w-12 h-12 mb-2 text-primary/50" />
+        <p className="font-medium">Nenhum agendamento encontrado</p>
+        <p className="text-sm">Não há agendamentos pendentes ou executados recentemente.</p>
+      </div>
+    );
+  }
+
+  function showAlert(arg0: string, arg1: string, arg2: string): void {
+    throw new Error('Function not implemented.');
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
-        <select value={status} onChange={(e) => setStatus(e.target.value as any)}>
-          <option value="ALL">Todos status</option>
-          <option>PENDING</option>
-          <option>EXECUTED</option>
-          <option>DONE</option>
-          <option>FAILED</option>
-          <option>CANCELED</option>
-        </select>
-        <select value={origem} onChange={(e) => setOrigem(e.target.value as any)}>
-          <option value="ALL">Todas origens</option>
-          <option value="AUTO">Automático</option>
-          <option value="MANUAL">Manual</option>
-        </select>
-        <button onClick={reload} disabled={loading}>
-          {loading ? 'Atualizando…' : 'Atualizar'}
-        </button>
-        {error && <span style={{ color: 'crimson' }}>{error}</span>}
-      </div>
-
-      <div style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ background: '#fafafa' }}>
-            <tr>
-              <th style={{ textAlign: 'left', padding: 8 }}>#</th>
-              <th style={{ textAlign: 'left', padding: 8 }}>Item</th>
-              <th style={{ textAlign: 'left', padding: 8 }}>Origem → Destino</th>
-              <th style={{ textAlign: 'left', padding: 8 }}>Qtd</th>
-              <th style={{ textAlign: 'left', padding: 8 }}>Execução</th>
-              <th style={{ textAlign: 'left', padding: 8 }}>OrigemTipo</th>
-              <th style={{ textAlign: 'left', padding: 8 }}>Status</th>
-              <th style={{ width: 220 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((a) => (
-              <tr key={a.id} style={{ borderTop: '1px solid #eee' }}>
-                <td style={{ padding: 8 }}>{a.id}</td>
-                <td style={{ padding: 8 }}>#{a.itemId}</td>
-                <td style={{ padding: 8 }}>
-                  {a.estoqueOrigemId} → {a.estoqueDestinoId}
-                </td>
-                <td style={{ padding: 8 }}>{a.quantidade}</td>
-                <td style={{ padding: 8 }}>{new Date(a.executarEm).toLocaleString()}</td>
-                <td style={{ padding: 8 }}>{a.origemTipo ?? 'MANUAL'}</td>
-                <td style={{ padding: 8 }}>
-                  <Badge s={a.status} />
-                </td>
-                <td style={{ padding: 8, display: 'flex', gap: 8 }}>
-                  {a.status === 'PENDING' && (
-                    <>
-                      <button
-                        onClick={() => executar(a.id)}
-                        disabled={executingId === a.id}
-                        style={{ padding: '4px 8px' }}
-                        title="Executa este agendamento agora"
-                      >
-                        {executingId === a.id ? 'Executando…' : 'Executar'}
-                      </button>
-                      <button
-                        onClick={() => cancel(a.id)}
-                        disabled={cancelingId === a.id}
-                        style={{ padding: '4px 8px' }}
-                        title="Cancela este agendamento"
-                      >
-                        {cancelingId === a.id ? 'Cancelando…' : 'Cancelar'}
-                      </button>
-                    </>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left">
+        <thead className="[&_tr]:border-b bg-muted/30 dark:bg-zinc-800/50">
+          <tr className="border-b border-border dark:border-zinc-700/50">
+            <th className="h-12 px-4 align-middle font-medium text-muted-foreground">ID</th>
+            <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Item</th>
+            <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Rota</th>
+            <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Qtd</th>
+            <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Executar Em</th>
+            <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Status</th>
+            {hasPermission('transfer:manage') &&
+                <th className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Ações</th>
+            }
+          </tr>
+        </thead>
+        
+        <tbody className="[&_tr:last-child]:border-0 divide-y divide-border dark:divide-zinc-800">
+          {agendamentos.map((ag) => (
+            <tr key={ag.id} className="hover:bg-muted/30 dark:hover:bg-zinc-800/40 transition-colors">
+              <td className="px-4 py-3 align-middle font-mono text-xs text-muted-foreground">
+                #{ag.id}
+              </td>
+              <td className="px-4 py-3 align-middle font-medium text-foreground">
+                {ag.item?.nome ?? `ID: ${ag.itemId}`}
+              </td>
+              <td className="px-4 py-3 align-middle text-muted-foreground text-xs"> 
+                {ag.estoqueOrigem?.nome ?? ag.estoqueOrigemId} → {ag.estoqueDestino?.nome ?? ag.estoqueDestinoId}
+              </td>
+              <td className="px-4 py-3 align-middle font-medium">{ag.quantidade}</td>
+              <td className="px-4 py-3 align-middle text-muted-foreground">{formatarDataHora(ag.executarEm)}</td>
+              <td className="px-4 py-3 align-middle">
+                <span 
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_STYLES[ag.status]}`}
+                  title={ag.status === 'FAILED' ? ag.erroUltimaTentativa ?? 'Erro desconhecido' : ag.status}
+                >
+                  {ag.status}
+                </span>
+              </td>
+              {hasPermission('transfer:manage') &&
+                <td className="px-4 py-3 align-middle text-right space-x-2">
+                  {ag.status === "PENDING" ? (
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => cancelarAgendamento(ag.id)}
+                      title="Cancelar Agendamento"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  ) : (
+                    ag.status === 'FAILED' ? (
+                       <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-muted-foreground hover:text-destructive"
+                          title={ag.erroUltimaTentativa ?? 'Erro desconhecido'}
+                          onClick={() => showAlert('Erro na Execução', ag.erroUltimaTentativa ?? 'Erro desconhecido', 'error')}
+                        >
+                          <Info className="w-4 h-4" />
+                        </Button>
+                    ) : (
+                       <span className="text-xs text-muted-foreground px-2">N/A</span>
+                    )
                   )}
                 </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} style={{ padding: 16, textAlign: 'center', color: '#666' }}>
-                  Sem agendamentos
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              }
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { useItemConfig } from '../../hooks/useItemConfig';
 
-export function AutoReposicaoForm({ estoqueId, itemId }:{estoqueId:number; itemId:number}) {
+export function AutoReposicaoForm({ estoqueId, itemId, }:{estoqueId:number; itemId:number}) 
+{
   const { cfg, setCfg, warehouses, loading, saving, error, msg, save } = useItemConfig(estoqueId, itemId);
 
   const preview = useMemo(() => {
