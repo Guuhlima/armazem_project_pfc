@@ -98,12 +98,6 @@ const GetItemById = () => {
     // ✅ Container principal: Mantém o fundo base do tema
     <div className="min-h-screen bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
 
-      {/* --- ✅ CORREÇÃO DO FUNDO ANIMADO --- */}
-      {/* Usamos 'fixed' e 'inset-0' para garantir que o fundo cubra 100% da tela,
-        atrás de todo o conteúdo (z-0).
-        O fundo base (bg-zinc-100 dark:bg-black) é aplicado AQUI,
-        então a área da margem da sidebar também terá o fundo animado.
-      */}
       <div
         className="fixed inset-0 z-0 animate-starfield opacity-40 dark:opacity-70 bg-zinc-100 dark:bg-black"
         style={{
@@ -111,7 +105,6 @@ const GetItemById = () => {
           backgroundSize: '50px 50px',
         }}
       />
-      {/* --- FIM DO FUNDO ANIMADO --- */}
 
       {/* Sidebar (z-50, 'fixed', fica acima de tudo) */}
       <Sidebar
