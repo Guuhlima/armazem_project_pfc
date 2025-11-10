@@ -9,6 +9,9 @@ import jwt from 'jsonwebtoken';
 
 let app: FastifyInstance;
 
+// senha válida para passar no AJV (minLength: 6)
+const SENHA_OK = 'senha123';
+
 beforeAll(async () => {
   app = await buildTestApp();
 });
@@ -60,22 +63,23 @@ describe('Cadastro público', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/usuarios/cadastro',
-      payload: { nome: 'Y', email: 'dup@a.com', senha: 'y' },
+      // manda senha válida para não cair em 400 por minLength
+      payload: { nome: 'Y', email: 'dup@a.com', senha: SENHA_OK },
     });
-    expect([409, 400]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(409);
   });
 });
 
 describe('Auth + RBAC', () => {
   it('login válido retorna token', async () => {
-    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']);
-    const token = await loginEObterToken('adm@a.com', 'senha');
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: SENHA_OK }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', SENHA_OK);
     expect(token).toBeTruthy();
   });
 
   it('GET /usuarios/visualizar requer user:manage', async () => {
-    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']); // ADMIN tem perms seedadas
-    const token = await loginEObterToken('adm@a.com', 'senha');
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: SENHA_OK }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', SENHA_OK);
 
     const res = await app.inject({
       method: 'GET',
@@ -87,12 +91,11 @@ describe('Auth + RBAC', () => {
   });
 
   it('GET /usuarios/visualizar sem perm retorna 403/401', async () => {
-    // usuário sem roles
-    const hash = await bcrypt.hash('senha', 10);
+    const hash = await bcrypt.hash(SENHA_OK, 10);
     await prisma.usuario.create({
       data: { email: 'user@a.com', nome: 'User', senha: hash },
     });
-    const token = await loginEObterToken('user@a.com', 'senha');
+    const token = await loginEObterToken('user@a.com', SENHA_OK);
 
     const res = await app.inject({
       method: 'GET',
@@ -103,11 +106,11 @@ describe('Auth + RBAC', () => {
   });
 
   it('GET /usuarios/visualizar/:id com perm', async () => {
-    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']);
-    const token = await loginEObterToken('adm@a.com', 'senha');
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: SENHA_OK }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', SENHA_OK);
 
     const alvo = await prisma.usuario.create({
-      data: { email: 'j@j', nome: 'Jo',  senha: await bcrypt.hash('x', 10) },
+      data: { email: 'j@j', nome: 'Jo', senha: await bcrypt.hash('x', 10) },
     });
 
     const res = await app.inject({
@@ -120,11 +123,11 @@ describe('Auth + RBAC', () => {
   });
 
   it('PUT /usuarios/editar/:id (user:manage)', async () => {
-    await criarUsuarioComRoles({ email: 'adm@a.com', senha: 'senha' }, ['ADMIN']);
-    const token = await loginEObterToken('adm@a.com', 'senha');
+    await criarUsuarioComRoles({ email: 'adm@a.com', senha: SENHA_OK }, ['ADMIN']);
+    const token = await loginEObterToken('adm@a.com', SENHA_OK);
 
     const u = await prisma.usuario.create({
-      data: { email: 'v@v', nome: 'Velho',  senha: await bcrypt.hash('abc32435@', 10) },
+      data: { email: 'v@v', nome: 'Velho', senha: await bcrypt.hash('abc32435@', 10) },
     });
 
     const res = await app.inject({
@@ -143,9 +146,8 @@ describe('Auth + RBAC', () => {
   });
 
   it('DELETE /usuarios/deletar/:id (user:delete)', async () => {
-    // cria role/permissions já seedadas; ADMIN tem user:delete pelo seedRBAC()
-    await criarUsuarioComRoles({ email: 'deleter@a.com', senha: 'senha' }, ['ADMIN']);
-    const token = await loginEObterToken('deleter@a.com', 'senha');
+    await criarUsuarioComRoles({ email: 'deleter@a.com', senha: SENHA_OK }, ['ADMIN']);
+    const token = await loginEObterToken('deleter@a.com', SENHA_OK);
 
     const u = await prisma.usuario.create({
       data: { email: 'd@d', nome: 'Del', senha: await bcrypt.hash('x', 10) },

@@ -27,7 +27,7 @@ export async function equipamentosRoutes(app: FastifyInstance) {
 
   app.post("/equipment/cadastro", {
     schema: { body: EquipamentoBodySchema },
-    preHandler: [app.rbac.requirePerm("equipment:manage")],
+    preHandler: [app.rbac.requirePerm("equipment:read")],
     handler: cadastrarEquipamento,
   });
 

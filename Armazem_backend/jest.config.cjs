@@ -17,7 +17,10 @@ module.exports = {
   setupFiles: ['<rootDir>/tests/env-setup.ts'],
 
   // 2) cria as tabelas no schema antes dos testes
-  setupFilesAfterEnv: ['<rootDir>/tests/db-setup.ts'],
+    setupFilesAfterEnv: [
+    '<rootDir>/tests/db-setup.ts',
+    '<rootDir>/tests/setupConsole.ts',
+  ],
 
   moduleNameMapper: {
     '^lib/(.*)$': '<rootDir>/src/lib/$1',

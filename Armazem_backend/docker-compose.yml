@@ -33,6 +33,21 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: armazem_redis
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "ARMAZEM_DEV_redis_123"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "ARMAZEM_DEV_redis_123", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   pgdata:
   rabbitmq-data:
+  redis-data:

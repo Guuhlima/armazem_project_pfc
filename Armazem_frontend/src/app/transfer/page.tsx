@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import TransferForm from "./create/TransferForm";
 import CreateEstoqueForm from "./create-estoque/CreateEstoqueForm";
 import ListEstoqueForm from "./list-estoque/ListarEstoque";
@@ -9,7 +8,7 @@ import Sidebar from "../components/Sidebar";
 import RecebimentoForm from "./create-recebimento/RecebimentoForm";
 import SaidaForm from "./create-saida/SaidaForm";
 import ContagensPage from "./contagem-ciclica/contagem";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -23,8 +22,9 @@ import {
 } from "lucide-react";
 import withAuth from "app/components/withAuth";
 import { AnimatePresence, motion } from "framer-motion";
-import { Separator } from '@/components/ui/separator'; 
-import { useIsClient } from '@/hooks/useIsClient'; 
+import { Separator } from '@/components/ui/separator';
+import { useIsClient } from '@/hooks/useIsClient';
+import { toast } from 'sonner';
 
 type View =
   | "inicio"
@@ -56,9 +56,9 @@ function ActionCard({
       whileHover={{ scale: 1.02, y: -2 }}
       whileTap={{ scale: 0.98 }}
       className="group w-full text-left rounded-xl shadow-xl transition
-                 bg-card/90 dark:bg-zinc-900/85 backdrop-blur-lg 
-                 border border-border dark:border-blue-800/50 
-                 hover:border-blue-500/50 dark:hover:border-blue-600/70" 
+                 bg-card/90 dark:bg-zinc-900/85 backdrop-blur-lg
+                 border border-border dark:border-blue-800/50
+                 hover:border-blue-500/50 dark:hover:border-blue-600/70"
       aria-label={title}
     >
       <CardContent className="p-5 md:p-6 flex items-center justify-between">
@@ -67,7 +67,7 @@ function ActionCard({
             {subtitle}
           </p>
           <h3 className="mt-1 text-lg font-semibold text-foreground">{title}</h3>
-          <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary"> 
+          <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary">
             <span>Abrir</span>
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
           </div>
@@ -83,20 +83,25 @@ function ActionCard({
 function Segmented({
   view,
   setView,
+  canManageStock = false,
 }: {
   view: View;
   setView: (v: View) => void;
+  canManageStock?: boolean;
 }) {
-  const btn = (v: View, label: string) => (
+  const btn = (v: View, label: string, disabled = false) => (
     <button
-      onClick={() => setView(v)}
+      onClick={() => !disabled && setView(v)}
       className={[
         "px-3 py-1.5 text-xs sm:text-sm rounded-md transition-colors",
-        view === v
-          ? "bg-primary text-primary-foreground shadow-sm" 
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        disabled
+          ? "opacity-50 cursor-not-allowed"
+          : view === v
+            ? "bg-primary text-primary-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
       ].join(" ")}
       aria-pressed={view === v}
+      aria-disabled={disabled}
     >
       {label}
     </button>
@@ -104,8 +109,8 @@ function Segmented({
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border dark:border-zinc-700/50 bg-card/90 dark:bg-zinc-900/70 backdrop-blur-sm p-1">
       {btn("inicio", "Início")}
-      {btn("criarEstoque", "Criar")}
-      {btn("listarEstoques", "Listar")}
+      {btn("criarEstoque", "Criar", !canManageStock)}
+      {btn("listarEstoques", "Listar", !canManageStock)}
       {btn("novaTransferencia", "Transferir")}
       {btn("novoRecebimento", "Receber")}
       {btn("novaSaida", "Saída")}
@@ -117,28 +122,42 @@ function Segmented({
 const TransferDashboardPage = () => {
   const [view, setView] = useState<View>("inicio");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { logout } = useAuth(); 
+  const { logout, hasPermission } = useAuth();
   const isClient = useIsClient();
 
-  if (!isClient) return null; 
+  if (!isClient) return null;
+
+  const canManageStock = hasPermission('stock:manage');
+  const restrictedViews: View[] = ['criarEstoque', 'listarEstoques'];
+
+  function safeSetView(v: View) {
+    if (restrictedViews.includes(v) && !canManageStock) {
+      toast.error('Acesso negado');
+      return;
+    }
+    setView(v);
+  }
 
   const handleLogout = async () => {
     await logout();
   };
 
   const viewTitles: Record<View, string> = {
-      inicio: "Painel de Transferências",
-      criarEstoque: "Criar Novo Estoque",
-      listarEstoques: "Estoques Cadastrados",
-      novaTransferencia: "Nova Transferência",
-      novoRecebimento: "Novo Recebimento",
-      novaSaida: "Nova Saída de Itens",
-      contagemCiclica: "Contagem Cíclica de Inventário"
+    inicio: "Painel de Transferências",
+    criarEstoque: "Criar Novo Estoque",
+    listarEstoques: "Estoques Cadastrados",
+    novaTransferencia: "Nova Transferência",
+    novoRecebimento: "Novo Recebimento",
+    novaSaida: "Nova Saída de Itens",
+    contagemCiclica: "Contagem Cíclica de Inventário"
   };
+
+  const isRestricted = restrictedViews.includes(view);
+  const blockRestricted = isRestricted && !canManageStock;
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
-      
+
       <div
         className="fixed inset-0 z-0 animate-neon-grid"
         style={{
@@ -150,7 +169,7 @@ const TransferDashboardPage = () => {
           backgroundSize: '30px 30px',
         }}
       >
-        <div 
+        <div
           className="absolute inset-0 hidden dark:block"
           style={{
             backgroundImage: `
@@ -166,7 +185,7 @@ const TransferDashboardPage = () => {
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onLogout={handleLogout} 
+        onLogout={handleLogout}
       />
 
       <main
@@ -182,7 +201,7 @@ const TransferDashboardPage = () => {
                 {view !== "inicio" ? (
                   <>
                     <button
-                      onClick={() => setView("inicio")}
+                      onClick={() => safeSetView("inicio")}
                       className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4" />
@@ -192,9 +211,9 @@ const TransferDashboardPage = () => {
                     <span className="font-medium text-primary">{viewTitles[view]}</span>
                   </>
                 ) : (
-                   <span className="font-medium text-primary flex items-center gap-2">
-                       <LayoutGrid className="w-4 h-4" /> Painel de Transferências
-                   </span>
+                  <span className="font-medium text-primary flex items-center gap-2">
+                    <LayoutGrid className="w-4 h-4" /> Painel de Transferências
+                  </span>
                 )}
               </nav>
               <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight text-foreground">
@@ -207,7 +226,7 @@ const TransferDashboardPage = () => {
               )}
             </div>
             <div className="w-full md:w-auto">
-                <Segmented view={view} setView={setView} />
+              <Segmented view={view} setView={safeSetView} canManageStock={canManageStock} />
             </div>
           </div>
 
@@ -220,12 +239,47 @@ const TransferDashboardPage = () => {
                 initial={enter} animate={center} exit={exit}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
               >
-                <ActionCard title="Criar estoque" subtitle="Novo" icon={<PlusCircle className="w-6 h-6" />} onClick={() => setView("criarEstoque")} />
-                <ActionCard title="Estoques existentes" subtitle="Consultar" icon={<Boxes className="w-6 h-6" />} onClick={() => setView("listarEstoques")} />
-                <ActionCard title="Nova transferência" subtitle="Operação" icon={<Repeat className="w-6 h-6" />} onClick={() => setView("novaTransferencia")} />
-                <ActionCard title="Novo recebimento" subtitle="Entrada" icon={<PlusCircle className="w-6 h-6" />} onClick={() => setView("novoRecebimento")} />
-                <ActionCard title="Nova saída" subtitle="Operação" icon={<PackageMinus className="w-6 h-6" />} onClick={() => setView("novaSaida")} />
-                <ActionCard title="Contagem cíclica" subtitle="Inventário rotativo" icon={<Boxes className="w-6 h-6" />} onClick={() => setView("contagemCiclica")} />
+                {canManageStock && (
+                  <>
+                    <ActionCard
+                      title="Criar estoque"
+                      subtitle="Novo"
+                      icon={<PlusCircle className="w-6 h-6" />}
+                      onClick={() => safeSetView("criarEstoque")}
+                    />
+                    <ActionCard
+                      title="Estoques existentes"
+                      subtitle="Consultar"
+                      icon={<Boxes className="w-6 h-6" />}
+                      onClick={() => safeSetView("listarEstoques")}
+                    />
+                  </>
+                )}
+
+                <ActionCard
+                  title="Nova transferência"
+                  subtitle="Operação"
+                  icon={<Repeat className="w-6 h-6" />}
+                  onClick={() => safeSetView("novaTransferencia")}
+                />
+                <ActionCard
+                  title="Novo recebimento"
+                  subtitle="Entrada"
+                  icon={<PlusCircle className="w-6 h-6" />}
+                  onClick={() => safeSetView("novoRecebimento")}
+                />
+                <ActionCard
+                  title="Nova saída"
+                  subtitle="Operação"
+                  icon={<PackageMinus className="w-6 h-6" />}
+                  onClick={() => safeSetView("novaSaida")}
+                />
+                <ActionCard
+                  title="Contagem cíclica"
+                  subtitle="Inventário rotativo"
+                  icon={<Boxes className="w-6 h-6" />}
+                  onClick={() => safeSetView("contagemCiclica")}
+                />
               </motion.section>
             )}
 
@@ -241,8 +295,15 @@ const TransferDashboardPage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 md:p-6">
-                    {view === "criarEstoque" && <CreateEstoqueForm />}
-                    {view === "listarEstoques" && <ListEstoqueForm />}
+                    {blockRestricted ? (
+                      <p className="text-sm text-red-500">Acesso negado.</p>
+                    ) : (
+                      <>
+                        {view === "criarEstoque" && <CreateEstoqueForm />}
+                        {view === "listarEstoques" && <ListEstoqueForm />}
+                      </>
+                    )}
+
                     {view === "novaTransferencia" && <TransferForm />}
                     {view === "novoRecebimento" && <RecebimentoForm />}
                     {view === "novaSaida" && <SaidaForm />}
@@ -258,7 +319,7 @@ const TransferDashboardPage = () => {
               <Button
                 variant="ghost"
                 className="text-primary hover:text-primary/90"
-                onClick={() => setView("inicio")}
+                onClick={() => safeSetView("inicio")}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Voltar ao menu principal

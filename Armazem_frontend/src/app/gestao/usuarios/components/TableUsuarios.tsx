@@ -206,16 +206,6 @@ const TableUsuario = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="w-full flex items-center justify-end gap-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={!showConfig || isDeletingThis}
-                          className="inline-flex items-center gap-1"
-                        >
-                          <Pencil className="h-4 w-4" />
-                          <span>Editar</span>
-                        </Button>
-
                         {showConfig && (
                           <Button
                             variant="default"

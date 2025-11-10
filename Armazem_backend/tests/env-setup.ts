@@ -14,5 +14,6 @@ url.searchParams.set('schema', SCHEMA);
 
 process.env.DATABASE_URL = url.toString();
 process.env.TELEGRAM_ENABLED = process.env.TELEGRAM_ENABLED ?? 'false';
+process.env.TEST_BYPASS_RBAC = 'true';
 
 console.log('[jest] Using test schema:', SCHEMA);

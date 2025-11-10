@@ -64,7 +64,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
         {!collapsed && openEquipamento && (
           <div className="ml-6 space-y-1">
-            {hasPermission('equipment:manage') && (
+            {hasPermission('equipment:read') && (
               <Link href="/equipamento/create" className={navItem(pathname, '/equipamento/create')}>
                 <Plus className="w-4 h-4" /> Criar
               </Link>

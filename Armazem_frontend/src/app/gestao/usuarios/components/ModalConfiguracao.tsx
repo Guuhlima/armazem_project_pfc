@@ -12,8 +12,8 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { api } from '@/services/api';
 
-type Estoque = { id: number; nome: string; role?: string | null };
-type Papel = 'ADMIN' | 'MEMBER';
+type Estoque = { id: number; nome: string };
+type Role = { id: number; nome: string };
 
 interface Props {
   userId: number;
@@ -30,10 +30,14 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
   const [estoques, setEstoques] = useState<Estoque[]>([]);
   const [selectedEstoqueId, setSelectedEstoqueId] = useState<number | null>(null);
 
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [roleId, setRoleId] = useState<number | null>(null);
+  const [roleInherited, setRoleInherited] = useState(false);
+
   const [chatId, setChatId] = useState('');
-  const [role, setRole] = useState<Papel | ''>('');
 
   const [loadingList, setLoadingList] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingSaveChat, setLoadingSaveChat] = useState(false);
   const [loadingTest, setLoadingTest] = useState(false);
   const [loadingRole, setLoadingRole] = useState(false);
@@ -42,7 +46,32 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
   const canSaveChat = useMemo(() => hasSelection && !!chatId.trim(), [hasSelection, chatId]);
   const canTest = canSaveChat;
 
-  // 🔹 1) Buscar estoques vinculados ao usuário (rota nova /admin/usuarios/:userId/estoques)
+  // 0) Carregar catálogo de roles quando abrir
+  useEffect(() => {
+    if (!open) return;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        setLoadingRoles(true);
+        const { data } = await api.get<{ items: Role[] }>(
+          `/admin/roles`,
+          { signal: ctrl.signal, withCredentials: true }
+        );
+        setRoles(Array.isArray(data?.items) ? data.items : []);
+      } catch (e) {
+        if (!ctrl.signal.aborted) {
+          console.error('Erro ao carregar catálogo de roles:', e);
+          toast.error(getErr(e, 'Falha ao carregar papéis'));
+          setRoles([]);
+        }
+      } finally {
+        if (!ctrl.signal.aborted) setLoadingRoles(false);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [open]);
+
+  // 1) Buscar estoques vinculados
   useEffect(() => {
     if (!open) return;
     const ctrl = new AbortController();
@@ -54,7 +83,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
           `/admin/usuarios/${userId}/estoques`,
           { signal: ctrl.signal, withCredentials: true }
         );
-
         const items = Array.isArray(data?.items) ? data.items : [];
         setEstoques(items);
 
@@ -63,8 +91,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
           setSelectedEstoqueId(null);
           return;
         }
-
-        // Se o usuário tem mais de um estoque, seleciona o primeiro automaticamente
         setSelectedEstoqueId(items[0].id);
       } catch (e) {
         if (!ctrl.signal.aborted) {
@@ -80,7 +106,7 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
     return () => ctrl.abort();
   }, [open, userId]);
 
-  // 🔹 2) Ao trocar de estoque, busca chatId e role
+  // 2) Ao trocar de estoque, buscar chatId e roleId atual
   useEffect(() => {
     if (!selectedEstoqueId) return;
     const ctrl = new AbortController();
@@ -89,7 +115,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
       const estoqueId = selectedEstoqueId;
 
       try {
-        // ChatId global do estoque
         const chatRes = await api.get<{ chatId: string | null }>(
           `/estoques/${estoqueId}/notify/telegram`,
           { signal: ctrl.signal, withCredentials: true }
@@ -100,35 +125,39 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
       }
 
       try {
-        // Role do usuário no estoque
-        const roleRes = await api.get<{ role: Papel | null }>(
+        // backend agora devolve { roleId, roleName, inherited }
+        const roleRes = await api.get<{ roleId: number | null; roleName: string | null; inherited?: boolean }>(
           `/admin/usuarios/${userId}/estoques/${estoqueId}/role`,
           { signal: ctrl.signal, withCredentials: true }
         );
-        setRole(roleRes.data?.role ?? '');
+        setRoleId(roleRes.data?.roleId ?? null);
+        setRoleInherited(!!roleRes.data?.inherited);
       } catch {
-        setRole('');
+        setRoleId(null);
+        setRoleInherited(false);
       }
     })();
 
     return () => ctrl.abort();
   }, [selectedEstoqueId, userId]);
 
-  // 🔹 Reset quando fechar o dialog
+  // Reset ao fechar
   useEffect(() => {
     if (!open) {
       setEstoques([]);
       setSelectedEstoqueId(null);
       setChatId('');
-      setRole('');
+      setRoleId(null);
+      setRoleInherited(false);
       setLoadingList(false);
+      setLoadingRoles(false);
       setLoadingSaveChat(false);
       setLoadingTest(false);
       setLoadingRole(false);
     }
   }, [open]);
 
-  // 🔹 Handlers
+  // --- Handlers ---
   async function handleSalvarTelegram() {
     if (!hasSelection || !chatId.trim()) return;
     setLoadingSaveChat(true);
@@ -152,22 +181,16 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
       return;
     }
     setLoadingTest(true);
-    const estoqueId = String(selectedEstoqueId);
-
     try {
       await api.post(
-        `/estoques/${estoqueId}/notify/telegram/test`,
+        `/estoques/${String(selectedEstoqueId)}/notify/telegram/test`,
         {},
         { withCredentials: true }
       );
-
       toast.success('Mensagem de teste enviada!');
     } catch (e: any) {
       const s = e?.response?.status;
       const d = e?.response?.data;
-      console.error('[TESTE TELEGRAM] erro', s, d || e);
-
-      // Agora 404 indica endpoint não encontrado (ex.: baseURL errada ou rota faltando)
       if (s === 404) toast.error('Endpoint não encontrado. Verifique a URL e as rotas do servidor.');
       else if (s === 401) toast.error('Sessão expirada.');
       else if (s === 403) toast.error('Sem permissão.');
@@ -178,15 +201,18 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
   }
 
   async function handleSalvarRole() {
-    if (!hasSelection || !role) return;
+    if (!hasSelection) return;
     setLoadingRole(true);
     try {
+      // envia { roleId } — se roleId for null, limpa e passa a herdar
       await api.put(
         `/admin/usuarios/${userId}/estoques/${selectedEstoqueId}/role`,
-        { role },
+        { roleId: roleId ?? null },
         { withCredentials: true }
       );
       toast.success('Permissão atualizada!');
+      // se setou explicitamente um roleId, não é herdado
+      setRoleInherited(roleId == null ? roleInherited : false);
     } catch (e) {
       toast.error(getErr(e, 'Falha ao salvar permissão'));
     } finally {
@@ -236,11 +262,11 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
           <p className="text-sm text-muted-foreground">
             Abra o bot{' '}
             <a
-              href="https://web.telegram.org/k/#@GSI_TESTETELEGRAM_BOT"
+              href="https://web.telegram.org/k/#@ARMAZEMG3_BOT"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline font-medium"
-              title="@GSI_TESTETELEGRAM_BOT"
+              title="@ARMAZEMG3_BOT"
             >
               ARMAZEMG3_BOT
             </a>
@@ -278,35 +304,43 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
 
         <Separator className="my-2" />
 
-        {/* Permissões */}
+        {/* Permissões por estoque */}
         <div className="space-y-3">
           <div className="font-medium">Permissões no estoque</div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
             <div>
               <Label htmlFor="role">Papel</Label>
               <Select
-                value={role}
-                onValueChange={(v) => setRole(v as Papel)}
-                disabled={!hasSelection}
+                value={roleId != null ? String(roleId) : ''}
+                onValueChange={(v) => setRoleId(Number(v))}
+                disabled={!hasSelection || loadingRoles}
               >
                 <SelectTrigger id="role">
-                  <SelectValue placeholder="Selecione um papel" />
+                  <SelectValue placeholder={loadingRoles ? 'Carregando papéis...' : 'Selecione um papel'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADMIN">ADMIN</SelectItem>
-                  <SelectItem value="MEMBER">MEMBER</SelectItem>
+                  {roles.map(r => (
+                    <SelectItem key={r.id} value={String(r.id)}>{r.nome}</SelectItem>
+                  ))}
+                  {/* opção para limpar (herdar) */}
+                  <SelectItem value="null">— Limpar e herdar —</SelectItem>
                 </SelectContent>
               </Select>
-              {!role && (
+              {roleId == null && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Nenhum papel definido para este usuário neste estoque.
+                  Nenhum papel definido neste estoque.
+                </p>
+              )}
+              {roleInherited && (
+                <p className="mt-1 text-xs text-blue-600">
+                  Papel herdado de role global (ex.: <b>SUPER-ADMIN</b>).
                 </p>
               )}
             </div>
             <Button
               variant="secondary"
               onClick={handleSalvarRole}
-              disabled={!role || !hasSelection || loadingRole}
+              disabled={!hasSelection || loadingRole}
             >
               {loadingRole ? 'Salvando...' : 'Salvar papel'}
             </Button>

@@ -228,14 +228,19 @@ model Estoque {
 model UsuarioEstoque {
   usuarioId Int
   estoqueId Int
+
   role      StockRole @default(MEMBER)
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  estoque Estoque @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+  roleId    Int?
+  roleRef   Role?     @relation(fields: [roleId], references: [id]) // nomeei roleRef só p/ não colidir
+
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  estoque   Estoque   @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
 
   @@id([usuarioId, estoqueId])
   @@map("usuarios_estoques")
 }
+
 
 model Notificacao {
   id        Int       @id @default(autoincrement())
@@ -335,6 +340,7 @@ model Role {
   usuarios        UsuarioRole[]
   perms           RolePerm[]
   rotasPermitidas PermissaoOnRoute[]
+  usuarioEstoque  UsuarioEstoque[]
 
   @@map("permissoes")
 }

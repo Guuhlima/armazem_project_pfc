@@ -16,7 +16,7 @@ export async function estoqueItensRoutes(app: FastifyInstance) {
 
   app.post("/stockmovi/cadastro/:id/adicionar-equipamento", {
     schema: { params: EstoqueItemParamsSchema, body: EstoqueItemBodySchema },
-    preHandler: [app.rbac.requirePerm("stock:manage")],
+    preHandler: [app.rbac.requirePerm("stock:read")],
     handler: adicionarItemAoEstoque,
   });
 

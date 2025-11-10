@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { EquipamentoBodySchema, EquipamentoParamsSchema } from '../schemas/equipment.schema';
 import { Static } from '@sinclair/typebox';
-import { dateOnlyToUTC } from 'utils/utils';
+import { dateOnlyToUTC } from '../utils/utils';
 import { prisma } from '../lib/prisma';
 
 type Body = Static<typeof EquipamentoBodySchema>;

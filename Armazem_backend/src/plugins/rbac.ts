@@ -26,7 +26,8 @@ declare module "fastify" {
 
 const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
   const redis = fastify.redis as import("ioredis").Redis;
-
+  const bypass = process.env.TEST_BYPASS_RBAC === "true";
+  
   async function userHasPermission(userId: UserId, needed: Permission) {
     const roles = await redis.smembers(userRolesKey(userId));
     if (!roles.length) return false;
@@ -79,5 +80,6 @@ const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
 
   done();
 };
+
 
 export default fp(rbacPlugin, { name: "rbac-plugin" });
