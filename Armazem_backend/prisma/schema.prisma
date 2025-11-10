@@ -58,12 +58,30 @@ enum DiscrepancyResolution {
   RECOUNT_CLOSED
 }
 
+enum LogType {
+  ACCESS
+  INVENTORY
+  BOT
+}
+
+enum LogAction {
+  LOGIN
+  LOGOUT
+  REQUEST
+  CREATE
+  UPDATE
+  DELETE
+  MOVE
+  TRANSFER
+  MESSAGE_SENT
+  MESSAGE_FAILED
+}
 
 model Usuario {
-  id                 Int     @id @default(autoincrement())
-  nome               String? @db.VarChar(255)
-  email              String  @unique @db.VarChar(255)
-  senha              String? @db.VarChar(255)
+  id    Int     @id @default(autoincrement())
+  nome  String? @db.VarChar(255)
+  email String  @unique @db.VarChar(255)
+  senha String? @db.VarChar(255)
 
   roles              UsuarioRole[]
   estoques           UsuarioEstoque[]
@@ -81,44 +99,45 @@ model Usuario {
 }
 
 model Ciente_cookies {
-  id            Int    @id @default(autoincrement())
-  userId        Int
-  ciencia        Boolean
+  id      Int     @id @default(autoincrement())
+  userId  Int
+  ciencia Boolean
 
   user Usuario @relation(fields: [userId], references: [id])
 }
 
 model Equipamento {
-  id             Int               @id @default(autoincrement())
-  nome           String?           @map("equipamento") @db.VarChar(255)
+  id             Int           @id @default(autoincrement())
+  nome           String?       @map("equipamento") @db.VarChar(255)
   quantidade     Int?
-  data           DateTime?         @db.Date
+  data           DateTime?     @db.Date
+  rastreioTipo   RastreioTipo  @default(NONE)
+  
   transferencias Transferencia[]
   estoqueItens   EstoqueItem[]
   agendamentos   TransferenciaAgendada[]
-
-  contagemTarefa        ContagemCiclicaTarefa[]
-  rastreioTipo   RastreioTipo      @default(NONE)
-
+  contagemTarefa ContagemCiclicaTarefa[]
   lotes          Lote[]
   seriais        Serial[]
-  movimentos   MovEstoque[] 
+  movimentos     MovEstoque[]
+
+  deletedAt      DateTime?
 
   @@map("equipamentos")
 }
 
 
 model Lote {
-  id         Int        @id @default(autoincrement())
-  itemId     Int
-  codigo     String
-  validade   DateTime?  @db.Date
-  createdAt  DateTime   @default(now())
+  id        Int       @id @default(autoincrement())
+  itemId    Int
+  codigo    String
+  validade  DateTime? @db.Date
+  createdAt DateTime  @default(now())
 
-  contagemTarefa        ContagemCiclicaTarefa[]
-  item       Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  seriais    Serial[]
-  movimentos MovEstoque[]
+  contagemTarefa ContagemCiclicaTarefa[]
+  item           Equipamento             @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  seriais        Serial[]
+  movimentos     MovEstoque[]
 
   @@unique([itemId, codigo], name: "unique_lote_por_item")
   @@index([itemId, validade])
@@ -126,15 +145,15 @@ model Lote {
 }
 
 model Serial {
-  id         Int        @id @default(autoincrement())
-  itemId     Int
-  numero     String     @unique
-  loteId     Int?       
-  createdAt  DateTime   @default(now())
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  numero    String   @unique
+  loteId    Int?
+  createdAt DateTime @default(now())
 
-  contagemTarefa        ContagemCiclicaTarefa[]
-  item       Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  lote       Lote?       @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  contagemTarefa ContagemCiclicaTarefa[]
+  item           Equipamento             @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  lote           Lote?                   @relation(fields: [loteId], references: [id], onDelete: SetNull)
 
   movimentos MovEstoque[]
 
@@ -143,23 +162,23 @@ model Serial {
 }
 
 model MovEstoque {
-  id               Int          @id @default(autoincrement())
+  id               Int      @id @default(autoincrement())
   itemId           Int
   loteId           Int?
   serialId         Int?
   estoqueOrigemId  Int?
   estoqueDestinoId Int?
   quantidade       Int
-  tipoEvento       String 
+  tipoEvento       String
   referenciaTabela String?
   referenciaId     Int?
-  createdAt        DateTime     @default(now())
+  createdAt        DateTime @default(now())
 
-  item     Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  lote     Lote?       @relation(fields: [loteId], references: [id], onDelete: Restrict)
-  serial   Serial?     @relation(fields: [serialId], references: [id], onDelete: Restrict)
-  origem   Estoque?    @relation("MovOrigem", fields: [estoqueOrigemId], references: [id], onDelete: Restrict)
-  destino  Estoque?    @relation("MovDestino", fields: [estoqueDestinoId], references: [id], onDelete: Restrict)
+  item    Equipamento @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  lote    Lote?       @relation(fields: [loteId], references: [id], onDelete: Restrict)
+  serial  Serial?     @relation(fields: [serialId], references: [id], onDelete: Restrict)
+  origem  Estoque?    @relation("MovOrigem", fields: [estoqueOrigemId], references: [id], onDelete: Restrict)
+  destino Estoque?    @relation("MovDestino", fields: [estoqueDestinoId], references: [id], onDelete: Restrict)
 
   @@index([itemId, loteId, serialId])
   @@index([estoqueOrigemId])
@@ -269,39 +288,39 @@ model Transferencia {
 }
 
 model EstoqueItem {
-  id               Int         @id @default(autoincrement())
-  estoqueId        Int
-  itemId           Int
-  quantidade       Int         @default(0)
-  minimo           Int         @default(0)
-  maximo           Int?
-  multiplo         Int?
-  alertaativo      Boolean     @default(false)
-  autoAtivo        Boolean     @default(false)
+  id                Int         @id @default(autoincrement())
+  estoqueId         Int
+  itemId            Int
+  quantidade        Int         @default(0)
+  minimo            Int         @default(0)
+  maximo            Int?
+  multiplo          Int?
+  alertaativo       Boolean     @default(false)
+  autoAtivo         Boolean     @default(false)
   origemPreferidaId Int?
-  leadTimeDias     Int?
-  classeAbc      AbcClasses?
-  lastCountedAt  DateTime?
-  nextCountDueAt DateTime?
+  leadTimeDias      Int?
+  classeAbc         AbcClasses?
+  lastCountedAt     DateTime?
+  nextCountDueAt    DateTime?
 
-  estoque     Estoque     @relation(fields: [estoqueId], references: [id])
-  item        Equipamento @relation(fields: [itemId], references: [id])
-  alertas     AlertaEstoque[]
+  estoque Estoque         @relation(fields: [estoqueId], references: [id])
+  item    Equipamento     @relation(fields: [itemId], references: [id])
+  alertas AlertaEstoque[]
 
   @@unique([itemId, estoqueId], name: "itemId_estoqueId")
   @@map("estoque_itens")
 }
 
 model AlertaEstoque {
-  id         Int         @id @default(autoincrement())
-  estoqueId  Int
-  itemId     Int
-  tipo       AlertaTipo
-  mensagem   String
-  resolvido  Boolean     @default(false)
-  createdAt  DateTime    @default(now())
-  resolvedAt DateTime?
-  ultimoEnvioAt DateTime? 
+  id            Int        @id @default(autoincrement())
+  estoqueId     Int
+  itemId        Int
+  tipo          AlertaTipo
+  mensagem      String
+  resolvido     Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  resolvedAt    DateTime?
+  ultimoEnvioAt DateTime?
 
   estoqueItem EstoqueItem @relation(fields: [itemId, estoqueId], references: [itemId, estoqueId])
 
@@ -398,9 +417,9 @@ model TransferenciaAgendada {
   tentativas          Int               @default(0)
   erroUltimaTentativa String?
 
-  origemTipo   String?
-  motivo       String?
-  dedupKey     String?   @unique
+  origemTipo String?
+  motivo     String?
+  dedupKey   String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -430,58 +449,58 @@ model MovimentacaoEstoque {
 }
 
 model ContagemCiclicaPolitica {
-  id           Int       @id @default(autoincrement())
-  estoqueId    Int
-  itemId       Int?
-  classeAbc    AbcClasses?
+  id             Int         @id @default(autoincrement())
+  estoqueId      Int
+  itemId         Int?
+  classeAbc      AbcClasses?
   frequenciaDias Int
   toleranciaPct  Float
-  contagemDupla  Boolean @default(true)
-  bloquearMov    Boolean @default(true)
-  ativa          Boolean @default(true)
+  contagemDupla  Boolean     @default(true)
+  bloquearMov    Boolean     @default(true)
+  ativa          Boolean     @default(true)
 
-  contagemTarefa        ContagemCiclicaTarefa[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  contagemTarefa ContagemCiclicaTarefa[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
-  estoque      Estoque   @relation(fields: [estoqueId], references: [id])
+  estoque Estoque @relation(fields: [estoqueId], references: [id])
 
+  @@unique([estoqueId, itemId, classeAbc], name: "politica_scope_unique")
   @@index([estoqueId, ativa])
   @@index([classeAbc])
-  @@unique([estoqueId, itemId, classeAbc], name: "politica_scope_unique")
   @@map("contagem_politicas")
 }
 
 model ContagemCiclicaTarefa {
-  id              Int         @id @default(autoincrement())
-  estoqueId       Int
-  itemId          Int
-  loteId          Int?
-  serialId        Int?
-  status          CountStatus @default(PENDING)
-  dueAt           DateTime
-  startedAt       DateTime?
-  closedAt        DateTime?
-  cancelReason    String?     @db.VarChar(255)
-  politicaId      Int?
-  toleranciaPct   Float?
-  contagemDupla   Boolean?
-  bloquearMov     Boolean?
+  id            Int         @id @default(autoincrement())
+  estoqueId     Int
+  itemId        Int
+  loteId        Int?
+  serialId      Int?
+  status        CountStatus @default(PENDING)
+  dueAt         DateTime
+  startedAt     DateTime?
+  closedAt      DateTime?
+  cancelReason  String?     @db.VarChar(255)
+  politicaId    Int?
+  toleranciaPct Float?
+  contagemDupla Boolean?
+  bloquearMov   Boolean?
 
   systemQtyAtStart Int?
   finalQty         Int?
   resolution       DiscrepancyResolution?
-  ajusteMovId      Int? 
+  ajusteMovId      Int?
 
-  createdById     Int?
-  closedById      Int?
+  createdById Int?
+  closedById  Int?
 
-  estoque         Estoque     @relation(fields: [estoqueId], references: [id])
-  item            Equipamento @relation(fields: [itemId], references: [id])
-  lote            Lote?       @relation(fields: [loteId], references: [id])
-  serial          Serial?     @relation(fields: [serialId], references: [id])
-  politica        ContagemCiclicaPolitica? @relation(fields: [politicaId], references: [id])
-  lancamentos     ContagemCiclicaLancamento[]
+  estoque     Estoque                     @relation(fields: [estoqueId], references: [id])
+  item        Equipamento                 @relation(fields: [itemId], references: [id])
+  lote        Lote?                       @relation(fields: [loteId], references: [id])
+  serial      Serial?                     @relation(fields: [serialId], references: [id])
+  politica    ContagemCiclicaPolitica?    @relation(fields: [politicaId], references: [id])
+  lancamentos ContagemCiclicaLancamento[]
 
   @@index([estoqueId, itemId, status, dueAt])
   @@map("contagem_tarefas")
@@ -490,14 +509,48 @@ model ContagemCiclicaTarefa {
 model ContagemCiclicaLancamento {
   id           Int      @id @default(autoincrement())
   tarefaId     Int
-  tentativa    Int 
+  tentativa    Int
   quantidade   Int
   contadoPorId Int?
   contadoEm    DateTime @default(now())
 
-  tarefa       ContagemCiclicaTarefa @relation(fields: [tarefaId], references: [id])
+  tarefa ContagemCiclicaTarefa @relation(fields: [tarefaId], references: [id])
 
   @@unique([tarefaId, tentativa])
   @@index([contadoEm])
   @@map("contagem_lancamentos")
+}
+
+model LogEvent {
+  id              String    @id @default(uuid()) @db.Uuid
+  type            LogType
+  action          LogAction
+  success         Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  actorUserId     String?   @db.Uuid
+  actorName       String?
+  ip              String?
+  userAgent       String?
+  httpMethod      String?
+  route           String?
+  correlationId   String?
+  message         String?
+  errorCode       String?
+  errorMessage    String?
+  itemId          Int?
+  estoqueId       Int?
+  transferenciaId Int?
+  botMessageId    String?
+  botChatId       String?
+
+  metadata Json? @db.JsonB
+
+  @@index([type, action, createdAt])
+  @@index([createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([itemId, createdAt])
+  @@index([estoqueId, createdAt])
+  @@index([route, createdAt])
+
+  @@map("log_event")
 }
