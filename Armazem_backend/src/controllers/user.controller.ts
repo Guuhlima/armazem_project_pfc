@@ -191,7 +191,6 @@ export async function visualizarUsuariosPorId(
     const id = Number(req.params.id);
 
     if (RBAC_SCOPE_MODE === 'loose') {
-      // Modo testes: sem escopo; sem vazar senha
       const usuario = await prisma.usuario.findUnique({
         where: { id },
         select: { id: true, nome: true, email: true },
@@ -200,7 +199,6 @@ export async function visualizarUsuariosPorId(
       return reply.send(usuario);
     }
 
-    // === LÓGICA ORIGINAL (modo strict) ===
     const requesterId = getRequesterId(req);
     if (!requesterId) return reply.code(401).send({ error: 'unauthorized' });
 
@@ -223,7 +221,6 @@ export async function visualizarUsuariosPorId(
       });
     }
 
-    // ADMIN só enxerga se estiver no mesmo(s) estoque(s)
     const meusEstoques = await prisma.usuarioEstoque.findMany({
       where: { usuarioId: requesterId, role: 'ADMIN' },
       select: { estoqueId: true },

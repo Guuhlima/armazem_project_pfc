@@ -29,6 +29,7 @@ import { startSchedulerLoop } from "./workers/scheduler";
 import { startConsumer } from "./workers/consumer-transfer";
 import { startCyclicCountWorker } from "./workers/contagem-ciclica.worker";
 import { startTelegram, stopTelegram } from "./service/telegram.service";
+import { logsRoutes } from "./routes/logs.routes";
 
 dotenv.config();
 
@@ -91,6 +92,7 @@ async function bootstrap() {
   await app.register(authRoutes);
   await app.register(resetPasswordRoutes);
   await app.register(usuariosRoutes, { prefix: "/user" });
+  await app.register(logsRoutes, { prefix: "/logs" });
 
   await app.register(async (r) => {
     r.addHook("onRequest", r.authenticate);

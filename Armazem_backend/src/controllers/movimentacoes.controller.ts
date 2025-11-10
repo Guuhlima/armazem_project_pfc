@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { MovQueryType } from '../schemas/movimentacoes.schema';
+import { parseDateLoose, truncBucket } from 'utils/utils';
 
 type LinhaAgg = {
   itemId: number;
@@ -13,24 +14,7 @@ type LinhaAgg = {
   tipos: string[];
 };
 
-const truncBucket = (d: Date, gran: 'day'|'hour') => {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  if (gran === 'hour') {
-    const hh = String(d.getHours()).padStart(2,'0');
-    return `${yyyy}-${mm}-${dd} ${hh}:00:00`;
-  }
-  return `${yyyy}-${mm}-${dd}`;
-};
-
-const parseDateLoose = (s?: string) => {
-  if (!s) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(`${s}T00:00:00`);
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? undefined : d;
-};
-
+// Relatorio de movimentações de equipamentos
 export async function relatorioMovimentacoesController(
   req: FastifyRequest<{ Querystring: MovQueryType }>,
   reply: FastifyReply

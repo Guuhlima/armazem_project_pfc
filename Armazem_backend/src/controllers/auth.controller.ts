@@ -34,7 +34,7 @@ function clearAuthCookies(reply: FastifyReply) {
   reply.clearCookie('refreshToken', cookieOpts);
 }
 
-
+// Fazer login de usuario (validação de credenciais, sincronzia RBAC e emite tokens)
 export async function login(
   req: FastifyRequest<{ Body: LoginBody }>,
   reply: FastifyReply
@@ -104,7 +104,7 @@ export async function login(
       message: 'Login realizado com sucesso',
       user: { id: user.id, nome: user.nome, email: user.email },
       ...tokens,
-      token: tokens.accessToken, // alias compatível com os testes
+      token: tokens.accessToken,
     });
   } catch (err) {
     req.server.log.error({ err }, 'login error');
@@ -112,6 +112,7 @@ export async function login(
   }
 }
 
+// Renovar tokens usando refreshToken
 export async function refreshToken(
   req: FastifyRequest<{ Body: { refreshToken?: string } }>,
   reply: FastifyReply
@@ -142,6 +143,7 @@ export async function refreshToken(
   }
 }
 
+// Fazer logout da sessão atual (revoga refresh e limpa cookies)
 export async function logout(
   req: FastifyRequest<{ Body: { refreshToken?: string } }>,
   reply: FastifyReply
@@ -170,6 +172,7 @@ export async function logout(
   }
 }
 
+// Fazer logout de todas as sessões do usuário
 export async function logoutAll(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id);
@@ -186,6 +189,7 @@ export async function logoutAll(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// Obter perfil atual + roles e permissoes do Redis
 export async function me(req: FastifyRequest, reply: FastifyReply) {
   try {
     const uid = Number((req.user as any)?.id);

@@ -13,14 +13,12 @@ import {
 } from "../controllers/agendamento.controller";
 import { verifyToken } from "../middlewares/verifyToken";
 
-// ⬇️ NOVO: controllers de execução
 import {
   postExecutarAgendamento,
   postExecutarPendentes,
   getAutoPendentes
-} from "../controllers/agendamento.controller"; // ajuste o path se usou outro nome
+} from "../controllers/agendamento.controller";
 
-// ⬇️ NOVO: schemas (typebox) p/ rotas novas
 import { Type } from "@sinclair/typebox";
 
 const Body = Type.Object({
@@ -40,7 +38,6 @@ const AutoPendentesQuery = Type.Object({
 export async function agendamentoRoutes(app: FastifyInstance) {
   app.addHook("preHandler", verifyToken);
 
-  // === existentes ===
   app.post("/agendamentos", {
     schema: { body: AgendamentoCreateBody },
     preHandler: [app.rbac.requirePerm("transfer:manage")],
@@ -63,7 +60,6 @@ export async function agendamentoRoutes(app: FastifyInstance) {
     preHandler: [app.rbac.requirePerm("transfer:manage")],
     handler: getAgendamentoById,
   });
-
 
   app.post("/agendamentos/:id/executar", {
     schema: { params: AgendamentoParams },

@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { TelegramService } from './telegram.service';
 
+// Service de notificao
 export const NotificationService = {
   async notifyUserInApp(userId: number, data: {
     type: string;

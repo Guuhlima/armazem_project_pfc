@@ -8,6 +8,7 @@ import { TelegramService } from '../service/telegram.service';
 import { executarAgendamento, executarPendentes } from "../service/agendamento.service";
 import { checarLimitesEGerenciarAlertas } from '../service/estoque-alertas.service';
 
+// Criar angedamento de transferencia futuras (validando dados e notifica)
 export async function createAgendamento(
   req: FastifyRequest<{ Body: AgendamentoCreateBodyType }>,
   reply: FastifyReply
@@ -73,6 +74,7 @@ export async function createAgendamento(
   }
 }
 
+// Cancelar agendamento pendete
 export async function cancelAgendamento(
   req: FastifyRequest<{ Params: AgendamentoParamsType }>,
   reply: FastifyReply
@@ -120,6 +122,7 @@ export async function cancelAgendamento(
   }
 }
 
+// Listar todos os agendamentos
 export async function listAgendamentos(_req: FastifyRequest, reply: FastifyReply) {
   try {
     const list = await prisma.transferenciaAgendada.findMany({
@@ -131,6 +134,7 @@ export async function listAgendamentos(_req: FastifyRequest, reply: FastifyReply
   }
 }
 
+// Obter um agendamento pelo id
 export async function getAgendamentoById(
   req: FastifyRequest<{ Params: AgendamentoParamsType }>,
   reply: FastifyReply
@@ -145,6 +149,7 @@ export async function getAgendamentoById(
   }
 }
 
+// Executar manualmente um agendamento específico
 export async function postExecutarAgendamento(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -155,6 +160,7 @@ export async function postExecutarAgendamento(
   return reply.send(r);
 }
 
+// Executar em lote agendamentos pendentes
 export async function postExecutarPendentes(
   req: FastifyRequest<{ Querystring: { limit?: string } }>,
   reply: FastifyReply
@@ -164,6 +170,7 @@ export async function postExecutarPendentes(
   return reply.send(r);
 }
 
+// Listar agendamentos automaticos pendentes (por item/estoque)
 export async function getAutoPendentes(
   req: FastifyRequest<{ Querystring: { itemId?: number; estoqueId?: number } }>,
   reply: FastifyReply
@@ -182,6 +189,7 @@ export async function getAutoPendentes(
   return reply.send(rows);
 }
 
+// Rodar rotina de auto-reposição para um item em um estoque
 export async function runAutoRepos(
   req: FastifyRequest<{ Body: { estoqueId: number; itemId: number } }>,
   reply: FastifyReply

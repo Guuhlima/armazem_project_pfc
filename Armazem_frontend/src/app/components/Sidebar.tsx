@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Warehouse, Plus, Trash2, Search, Pencil, Repeat, LogOut,
   ChevronsLeft, ChevronsRight, ChevronDown, ChevronRight,
-  Package, Users, UserPlus, Shield, UserRoundCheck
+  Package, Users, UserPlus, Shield, UserRoundCheck, Logs, Cog, Clipboard
 } from 'lucide-react';
 import { useState } from 'react';
 import DarkModeToggle from './DarkModeToggle';
@@ -69,21 +69,6 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 <Plus className="w-4 h-4" /> Criar
               </Link>
             )}
-            {hasPermission('equipment:manage') && (
-              <Link href="/equipamento/delete" className={navItem(pathname, '/equipamento/delete')}>
-                <Trash2 className="w-4 h-4" /> Deletar
-              </Link>
-            )}
-            {hasPermission('equipment:read') && (
-              <Link href="/equipamento/get" className={navItem(pathname, '/equipamento/get')}>
-                <Search className="w-4 h-4" /> Consultar
-              </Link>
-            )}
-            {hasPermission('equipment:manage') && (
-              <Link href="/equipamento/update" className={navItem(pathname, '/equipamento/update')}>
-                <Pencil className="w-4 h-4" /> Editar
-              </Link>
-            )}
           </div>
         )}
 
@@ -114,17 +99,20 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 <Link href="/gestao/usuarios" className={navItem(pathname, '/gestao/usuarios')}>
                   <UserPlus className="w-4 h-4" /> Usuários
                 </Link>
-                <Link href="/gestao/permissoes" className={navItem(pathname, '/gestao/permissoes')}>
+                {/* <Link href="/gestao/permissoes" className={navItem(pathname, '/gestao/permissoes')}>
                   <Shield className="w-4 h-4" /> Permissões
-                </Link>
-                <Link href="/gestao/solicitacoes" className={navItem(pathname, '/gestao/solicitacoes')}>
+                </Link> */}
+                {/* <Link href="/gestao/solicitacoes" className={navItem(pathname, '/gestao/solicitacoes')}>
                   <UserRoundCheck className="w-4 h-4" /> Solicitações
-                </Link>
+                </Link> */}
                 <Link href="/gestao/relatorio" className={navItem(pathname, '/gestao/relatorio')}>
-                  <UserRoundCheck className='w-4 h-4' /> Relatorio
+                  <Clipboard className='w-4 h-4' /> Relatorio
                 </Link>
                 <Link href="/gestao/configauto" className={navItem(pathname, '/gestao/configauto')}>
-                  <UserRoundCheck className='w-4 h-4' /> Configuração estoque
+                  <Cog className='w-4 h-4' /> Configuração estoque
+                </Link>
+                <Link href="/gestao/logs" className={navItem(pathname, '/gestao/logs')}>
+                  <Logs className='w-4 h-4' /> Logs
                 </Link>
               </div>
             )}

@@ -1,6 +1,8 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 
+// Obter permissão do usuario em um estoque
+// Se for SUPER-ADMIN, retorna ADMIN Herdado
 export async function getUserStockRole(req: FastifyRequest, reply: FastifyReply) {
   const { userId, estoqueId } = req.params as { userId: string; estoqueId: string };
 
@@ -28,6 +30,7 @@ export async function getUserStockRole(req: FastifyRequest, reply: FastifyReply)
   return reply.send({ role: null });
 }
 
+// Atualizar permissão de usuario no estoque
 export async function updateUserStockRole(req: FastifyRequest, reply: FastifyReply) {
   const { userId, estoqueId } = req.params as { userId: string; estoqueId: string };
   const { role } = (req.body ?? {}) as { role?: "ADMIN" | "MEMBER" };
@@ -45,6 +48,7 @@ export async function updateUserStockRole(req: FastifyRequest, reply: FastifyRep
   return reply.send({ ok: true });
 }
 
+// Listar estoque vinculados a um usuario
 export async function listUserStocks(
   req: FastifyRequest<{ Params: { userId: string } }>,
   reply: FastifyReply

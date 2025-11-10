@@ -80,10 +80,6 @@ export async function markAllRead(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
-/* ===============================
-   TELEGRAM (escopo por usuário+estoque)
-   =============================== */
-
 export const getTelegramNotifyForMe: RouteHandler<{ Params: EstoqueOnly }> = async (req, reply) => {
   try {
     const usuarioId = Number((req.user as any)?.id)
