@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Warehouse, Plus, Trash2, Search, Pencil, Repeat, LogOut,
+  Warehouse, Plus, Repeat, LogOut,
   ChevronsLeft, ChevronsRight, ChevronDown, ChevronRight,
-  Package, Users, UserPlus, Shield, UserRoundCheck, Logs, Cog, Clipboard
+  Package, Users, UserPlus, Cog, Clipboard
 } from 'lucide-react';
 import { useState } from 'react';
 import DarkModeToggle from './DarkModeToggle';
@@ -110,9 +110,6 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 </Link>
                 <Link href="/gestao/configauto" className={navItem(pathname, '/gestao/configauto')}>
                   <Cog className='w-4 h-4' /> Configuração estoque
-                </Link>
-                <Link href="/gestao/logs" className={navItem(pathname, '/gestao/logs')}>
-                  <Logs className='w-4 h-4' /> Logs
                 </Link>
               </div>
             )}

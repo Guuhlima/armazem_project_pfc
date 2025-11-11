@@ -431,7 +431,7 @@ export async function patchEstoqueItemAutoConfig(
       autoAtivo: boolean;
       maximo: number | null;
       multiplo: number | null;
-      origemPreferidaId: number | null;
+      origemPreferidaId: number | null | 0;
       leadTimeDias: number | null;
     }>;
   }>,
@@ -440,54 +440,89 @@ export async function patchEstoqueItemAutoConfig(
   try {
     const estoqueId = Number(req.params.estoqueId);
     const itemId = Number(req.params.itemId);
-    const { autoAtivo, maximo, multiplo, origemPreferidaId, leadTimeDias } = req.body ?? {};
-
-    if (multiplo != null && multiplo < 1) {
-      return reply.status(400).send({ error: 'multiplo deve ser >= 1' });
-    }
-    if (maximo != null && maximo < 0) {
-      return reply.status(400).send({ error: 'maximo deve ser >= 0' });
+    if (!Number.isFinite(estoqueId) || !Number.isFinite(itemId)) {
+      return reply.code(400).send({ error: 'Parâmetros inválidos.' });
     }
 
-    const updated = await prisma.estoqueItem.upsert({
-      where: { itemId_estoqueId: { itemId, estoqueId } },
-      create: {
-        itemId,
-        estoqueId,
-        quantidade: 0,
-        minimo: 0,
-        autoAtivo: !!autoAtivo,
-        maximo: maximo ?? null,
-        multiplo: multiplo ?? null,
-        origemPreferidaId: origemPreferidaId ?? null,
-        leadTimeDias: leadTimeDias ?? null,
-      } as any,
-      update: {
-        ...(autoAtivo !== undefined ? { autoAtivo } : {}),
-        ...(maximo !== undefined ? { maximo } : {}),
-        ...(multiplo !== undefined ? { multiplo } : {}),
-        ...(origemPreferidaId !== undefined ? { origemPreferidaId } : {}),
-        ...(leadTimeDias !== undefined ? { leadTimeDias } : {}),
-      },
-      select: {
-        itemId: true,
-        estoqueId: true,
-        quantidade: true,
-        minimo: true,
-        autoAtivo: true,
-        maximo: true,
-        multiplo: true,
-        origemPreferidaId: true,
-        leadTimeDias: true,
+    // Body pode vir vazio => só executar auto-reposição
+    const hasBody = req.body && Object.keys(req.body).length > 0;
+
+    // normalizações
+    const autoAtivo = req.body?.autoAtivo;
+    const maximo = req.body?.maximo;
+    const multiplo = req.body?.multiplo;
+    // 0 (ou <=0) não é preferida
+    const origemPreferidaId =
+      req.body?.origemPreferidaId && req.body?.origemPreferidaId > 0
+        ? req.body.origemPreferidaId
+        : null;
+    const leadTimeDias = req.body?.leadTimeDias;
+
+    // validações (só quando vier no body)
+    if (hasBody) {
+      if (multiplo != null && multiplo < 1) {
+        return reply.status(400).send({ error: 'multiplo deve ser >= 1' });
+      }
+      if (maximo != null && maximo < 0) {
+        return reply.status(400).send({ error: 'maximo deve ser >= 0' });
+      }
+    }
+
+    let updated: any = null;
+
+    if (hasBody) {
+      // upsert da config
+      updated = await prisma.estoqueItem.upsert({
+        where: { itemId_estoqueId: { itemId, estoqueId } },
+        create: {
+          itemId,
+          estoqueId,
+          quantidade: 0,
+          minimo: 0,
+          autoAtivo: !!autoAtivo,
+          maximo: maximo ?? null,
+          multiplo: multiplo ?? null,
+          origemPreferidaId,
+          leadTimeDias: leadTimeDias ?? null,
+        } as any,
+        update: {
+          ...(autoAtivo !== undefined ? { autoAtivo } : {}),
+          ...(maximo !== undefined ? { maximo } : {}),
+          ...(multiplo !== undefined ? { multiplo } : {}),
+          ...(req.body?.origemPreferidaId !== undefined ? { origemPreferidaId } : {}),
+          ...(leadTimeDias !== undefined ? { leadTimeDias } : {}),
+        },
+        select: {
+          itemId: true,
+          estoqueId: true,
+          quantidade: true,
+          minimo: true,
+          autoAtivo: true,
+          maximo: true,
+          multiplo: true,
+          origemPreferidaId: true,
+          leadTimeDias: true,
+        },
+      });
+    }
+
+    const result: any = await checarLimitesEGerenciarAlertas(estoqueId, itemId);
+
+    return reply.send({
+      ok: true,
+      ...(hasBody ? { updated } : {}),
+      result: {
+        created: !!result?.created,
+        agendamentoId: result?.agendamentoId ?? null,
+        origemId: result?.origemId ?? null,
+        quantidade: result?.quantidade ?? null,
+        reason: result?.reason ?? null,
+        debug: result?.debug ?? null,
+        alert: result?.kind ? result : null,
       },
     });
-
-    // opcional: já dispara a checagem/automação após salvar
-    await checarLimitesEGerenciarAlertas(estoqueId, itemId).catch(() => {});
-
-    return reply.send(updated);
   } catch (e) {
-    req.log?.error(e, 'erro patchEstoqueItemAutoConfig');
-    return reply.status(500).send({ error: 'Erro ao salvar automação do item' });
+    (req.log as any)?.error?.(e, 'erro patchEstoqueItemAutoConfig');
+    return reply.status(500).send({ error: 'Erro ao salvar/rodar automação do item' });
   }
 }

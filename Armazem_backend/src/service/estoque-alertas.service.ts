@@ -2,26 +2,16 @@ import { prisma } from "../lib/prisma";
 import { TelegramService } from "./telegram.service";
 import type { TelegramResult } from "./telegram.service";
 import { publish } from "../queue/rabbit";
-
 import crypto from "crypto";
 
-// ✅ flag opcional pra testar sem fila (cai no catch e cria local)
 const FORCE_LOCAL_FALLBACK = process.env.FORCE_LOCAL_FALLBACK === "1";
-
-// ✅ throttle à prova de NaN
 const TELEGRAM_THROTTLE_MINUTES = (() => {
   const n = Number(process.env.TELEGRAM_THROTTLE_MINUTES);
   return Number.isFinite(n) && n > 0 ? n : 60;
 })();
-
 const SYSTEM_USER_ID = Number(process.env.SYSTEM_USER_ID ?? 1);
 
-type AlertBase = {
-  quantidade: number;
-  minimo: number;
-  telegram?: TelegramResult;
-};
-
+type AlertBase = { quantidade: number; minimo: number; telegram?: TelegramResult };
 type NoneReason = "NO_DONOR" | "NO_QTY" | "DUPLICATE" | "NOT_BELOW_MIN";
 
 export type AlertEvent =
@@ -29,6 +19,15 @@ export type AlertEvent =
   | ({ kind: "THROTTLED"; tipo: "ABAIXO_MINIMO" | "RUPTURA" } & AlertBase)
   | ({ kind: "RESOLVED" } & AlertBase)
   | { kind: "NONE"; reason?: NoneReason };
+
+function ceilToMultiple(x: number, m: number) {
+  if (!m || m <= 1) return x;
+  return Math.ceil(x / m) * m;
+}
+function floorToMultiple(x: number, m: number) {
+  if (!m || m <= 1) return x;
+  return Math.floor(x / m) * m;
+}
 
 export async function checarLimitesEGerenciarAlertas(
   estoqueId: number,
@@ -53,7 +52,7 @@ export async function checarLimitesEGerenciarAlertas(
   const itemNome = (ei.item?.nome ?? "").trim() || `Item #${itemId}`;
   const minimo = ei.minimo ?? 0;
   const abaixoMinimo = ei.quantidade <= minimo;
-  const ruptura = ei.quantidade <= 0; // ✅ tolera negativos
+  const ruptura = ei.quantidade <= 0;
   const tipoAtual: "RUPTURA" | "ABAIXO_MINIMO" = ruptura ? "RUPTURA" : "ABAIXO_MINIMO";
 
   if (ei.autoAtivo && abaixoMinimo) {
@@ -63,7 +62,7 @@ export async function checarLimitesEGerenciarAlertas(
           itemId,
           estoqueDestinoId: estoqueId,
           origemTipo: "AUTO",
-          status: "PENDING", // ✅ bloqueia só se estiver pendente
+          status: "PENDING",
         },
         select: { id: true },
       });
@@ -83,126 +82,118 @@ export async function checarLimitesEGerenciarAlertas(
         });
       }
 
-      // ✅ para testar sem consumer da fila: força cair no catch
       if (FORCE_LOCAL_FALLBACK) {
         throw new Error("FORCED_FALLBACK_FOR_TEST");
       }
-    } catch (e) {
+    } catch {
       const alvo = (ei.maximo ?? ei.minimo) || ei.minimo;
-      let qtd = Math.max(0, alvo - ei.quantidade);
-      if (ei.multiplo && ei.multiplo > 1) {
-        qtd = Math.ceil(qtd / ei.multiplo) * ei.multiplo;
+      const mult = Math.max(1, ei.multiplo ?? 1);
+
+      const falta = Math.max(0, alvo - ei.quantidade);
+      let qtdNecessaria = falta > 0 ? ceilToMultiple(falta, mult) : 0;
+      if (qtdNecessaria <= 0) {
+        return { kind: "THROTTLED", tipo: tipoAtual, quantidade: ei.quantidade, minimo };
       }
 
-      if (qtd > 0) {
-        const origemCands = await prisma.estoqueItem.findMany({
-          where: {
+      const origemRows = await prisma.estoqueItem.findMany({
+        where: { itemId, estoqueId: { not: estoqueId }, quantidade: { gt: 0 } },
+        select: { estoqueId: true, quantidade: true, minimo: true },
+      });
+
+      if (!origemRows.length) {
+        await publish("procurement.requested", {
+          itemId,
+          estoqueDestinoId: estoqueId,
+          motivo: "SEM_ORIGEM_INTERNA",
+          faltante: Math.max(0, alvo - ei.quantidade),
+          multiplo: ei.multiplo ?? null,
+          ts: Date.now(),
+        }).catch(() => {});
+        try {
+          await TelegramService.sendLowStockAlert({
+            estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo,
+          });
+        } catch {}
+        return { kind: "THROTTLED", tipo: tipoAtual, quantidade: ei.quantidade, minimo };
+      }
+
+      // calcula SOBRA = saldoOrigem - minimoOrigem (precisa ao menos 1 múltiplo)
+      type Cand = { estoqueId: number; saldo: number; minOrigem: number; sobra: number };
+      const candidatos: Cand[] = origemRows.map(o => {
+        const minO = o.minimo ?? 0;
+        return {
+          estoqueId: o.estoqueId,
+          saldo: o.quantidade,
+          minOrigem: minO,
+          sobra: o.quantidade - minO,
+        };
+      }).filter(c => c.sobra >= mult);
+
+      if (!candidatos.length) {
+        return { kind: "THROTTLED", tipo: tipoAtual, quantidade: ei.quantidade, minimo };
+      }
+
+      // origem preferida, se tiver sobra suficiente
+      let origem: Cand | undefined;
+      if (ei.origemPreferidaId && ei.origemPreferidaId !== estoqueId) {
+        origem = candidatos.find(c => c.estoqueId === ei.origemPreferidaId);
+      }
+      // senão a de maior SOBRA
+      if (!origem) {
+        candidatos.sort((a, b) => b.sobra - a.sobra);
+        origem = candidatos[0];
+      }
+
+      // limitar pela SOBRA (não tirar o mínimo da origem)
+      let qtd = Math.min(qtdNecessaria, origem.sobra);
+      // respeitar múltiplo (floor após limitar)
+      qtd = floorToMultiple(qtd, mult);
+
+      if (qtd <= 0) {
+        return { kind: "THROTTLED", tipo: tipoAtual, quantidade: ei.quantidade, minimo };
+      }
+
+      // dedupe forte por origem->destino+item+quantidade
+      const dedupKey = crypto
+        .createHash("sha1")
+        .update(`${itemId}:${origem.estoqueId}->${estoqueId}:${qtd}:ABAIXO_MINIMO`)
+        .digest("hex");
+
+      const exists = await prisma.transferenciaAgendada.findUnique({ where: { dedupKey } }).catch(() => null);
+      if (!exists) {
+        const executarEm =
+          ei.leadTimeDias && ei.leadTimeDias > 0
+            ? new Date(Date.now() + ei.leadTimeDias * 24 * 60 * 60 * 1000)
+            : new Date();
+
+        const ag = await prisma.transferenciaAgendada.create({
+          data: {
             itemId,
-            estoqueId: { not: estoqueId },
-            quantidade: { gt: 0 },
-          },
-          select: { estoqueId: true, quantidade: true, minimo: true },
+            estoqueOrigemId: origem.estoqueId,
+            estoqueDestinoId: estoqueId,
+            quantidade: qtd,
+            usuarioId: SYSTEM_USER_ID,
+            executarEm,
+            status: "PENDING",
+            origemTipo: "AUTO",
+            motivo: "ABAIXO_MINIMO",
+            dedupKey,
+          } as any,
         });
 
-        if (!origemCands.length) {
-          // (opcional) dispara compra/produção externa
-          await publish("procurement.requested", {
-            itemId,
-            estoqueDestinoId: estoqueId,
-            motivo: "SEM_ORIGEM_INTERNA",
-            faltante: Math.max(0, ((ei.maximo ?? ei.minimo) || ei.minimo) - ei.quantidade),
-            multiplo: ei.multiplo ?? null,
-            ts: Date.now(),
-          }).catch(() => {});
-
-          // (opcional) alerta explícito
-          try {
-            await TelegramService.sendLowStockAlert({
-              estoqueId,
-              itemId,
-              itemNome,
-              quantidade: ei.quantidade,
-              minimo,
-            });
-          } catch {}
-
-          return {
-            kind: "THROTTLED", // pode ser "NONE" se preferir
-            tipo: tipoAtual,
-            quantidade: ei.quantidade,
-            minimo,
-          };
-        }
-
-        // ✅ preferida só se for DIFERENTE do destino
-        const preferida =
-          ei.origemPreferidaId && ei.origemPreferidaId !== estoqueId
-            ? origemCands.find(
-                (o) => o.estoqueId === ei.origemPreferidaId && o.quantidade > 0
-              )
-            : undefined;
-
-        const origem =
-          preferida ??
-          origemCands.sort((a, b) => b.quantidade - a.quantidade)[0];
-
-        if (origem) {
-          // limita pela disponibilidade do doador
-          qtd = Math.min(qtd, origem.quantidade);
-
-          // ✅ reaplica múltiplo após limitar
-          if (ei.multiplo && ei.multiplo > 1) {
-            qtd = Math.floor(qtd / ei.multiplo) * ei.multiplo;
-          }
-
-          if (qtd <= 0) {
-            return {
-              kind: "THROTTLED",
-              tipo: tipoAtual,
-              quantidade: ei.quantidade,
-              minimo,
-            };
-          }
-
-          const dedupKey = crypto
-            .createHash("sha1")
-            .update(`${itemId}:${origem.estoqueId}->${estoqueId}:${alvo}:ABAIXO_MINIMO`)
-            .digest("hex");
-
-          const exists = await prisma.transferenciaAgendada
-            .findUnique({ where: { dedupKey } })
-            .catch(() => null);
-
-          if (!exists) {
-            const ag = await prisma.transferenciaAgendada.create({
-              data: {
-                itemId,
-                estoqueOrigemId: origem.estoqueId,
-                estoqueDestinoId: estoqueId,
-                quantidade: qtd,
-                usuarioId: SYSTEM_USER_ID,
-                executarEm: new Date(), // (opcional) considerar leadTimeDias aqui
-                status: "PENDING",
-                origemTipo: "AUTO",
-                motivo: "ABAIXO_MINIMO",
-                dedupKey,
-              } as any,
-            });
-
-            try {
-              await TelegramService.sendAgendamentoCreatedNotification({
-                agendamentoId: ag.id,
-                itemNome,
-                quantidade: ag.quantidade,
-                estoqueOrigemId: ag.estoqueOrigemId,
-                estoqueDestinoId: ag.estoqueDestinoId,
-                executarEm: ag.executarEm,
-                usuario: "system:auto (fallback)",
-              });
-            } catch {}
-          }
-        }
+        try {
+          await TelegramService.sendAgendamentoCreatedNotification({
+            agendamentoId: ag.id,
+            itemNome,
+            quantidade: ag.quantidade,
+            estoqueOrigemId: ag.estoqueOrigemId,
+            estoqueDestinoId: ag.estoqueDestinoId,
+            executarEm: ag.executarEm,
+            usuario: "system:auto (fallback)",
+          });
+        } catch {}
       }
+      // ======= /FALLBACK LOCAL =======
     }
   }
 
@@ -217,9 +208,7 @@ export async function checarLimitesEGerenciarAlertas(
       : `Quantidade (${ei.quantidade}) abaixo do mínimo (${minimo}).`;
 
     await prisma.$transaction([
-      prisma.alertaEstoque.create({
-        data: { estoqueId, itemId, tipo: tipoAtual, mensagem: msg },
-      }),
+      prisma.alertaEstoque.create({ data: { estoqueId, itemId, tipo: tipoAtual, mensagem: msg } }),
       prisma.estoqueItem.update({
         where: { itemId_estoqueId: { itemId, estoqueId } },
         data: { alertaativo: true },
@@ -233,28 +222,10 @@ export async function checarLimitesEGerenciarAlertas(
     });
 
     const telegram: TelegramResult = ruptura
-      ? await TelegramService.sendRupturaAlert({
-          estoqueId,
-          itemId,
-          itemNome,
-          quantidade: ei.quantidade,
-          minimo,
-        })
-      : await TelegramService.sendLowStockAlert({
-          estoqueId,
-          itemId,
-          itemNome,
-          quantidade: ei.quantidade,
-          minimo,
-        });
+      ? await TelegramService.sendRupturaAlert({ estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo })
+      : await TelegramService.sendLowStockAlert({ estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo });
 
-    return {
-      kind: "OPEN",
-      tipo: tipoAtual,
-      quantidade: ei.quantidade,
-      minimo,
-      telegram,
-    };
+    return { kind: "OPEN", tipo: tipoAtual, quantidade: ei.quantidade, minimo, telegram };
   }
 
   if (abaixoMinimo && ei.alertaativo) {
@@ -264,9 +235,7 @@ export async function checarLimitesEGerenciarAlertas(
         : `Quantidade (${ei.quantidade}) abaixo do mínimo (${minimo}).`;
 
       await prisma.$transaction([
-        prisma.alertaEstoque.create({
-          data: { estoqueId, itemId, tipo: tipoAtual, mensagem: msg },
-        }),
+        prisma.alertaEstoque.create({ data: { estoqueId, itemId, tipo: tipoAtual, mensagem: msg } }),
         prisma.estoqueItem.update({
           where: { itemId_estoqueId: { itemId, estoqueId } },
           data: { alertaativo: true },
@@ -274,28 +243,10 @@ export async function checarLimitesEGerenciarAlertas(
       ]);
 
       const telegram: TelegramResult = ruptura
-        ? await TelegramService.sendRupturaAlert({
-            estoqueId,
-            itemId,
-            itemNome,
-            quantidade: ei.quantidade,
-            minimo,
-          })
-        : await TelegramService.sendLowStockAlert({
-            estoqueId,
-            itemId,
-            itemNome,
-            quantidade: ei.quantidade,
-            minimo,
-          });
+        ? await TelegramService.sendRupturaAlert({ estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo })
+        : await TelegramService.sendLowStockAlert({ estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo });
 
-      return {
-        kind: "OPEN",
-        tipo: tipoAtual,
-        quantidade: ei.quantidade,
-        minimo,
-        telegram,
-      };
+      return { kind: "OPEN", tipo: tipoAtual, quantidade: ei.quantidade, minimo, telegram };
     }
 
     const agora = new Date();
@@ -312,40 +263,17 @@ export async function checarLimitesEGerenciarAlertas(
 
       telegram =
         alertaAberto.tipo === "RUPTURA"
-          ? await TelegramService.sendRupturaAlert({
-              estoqueId,
-              itemId,
-              itemNome,
-              quantidade: ei.quantidade,
-              minimo,
-            })
-          : await TelegramService.sendLowStockAlert({
-              estoqueId,
-              itemId,
-              itemNome,
-              quantidade: ei.quantidade,
-              minimo,
-            });
+          ? await TelegramService.sendRupturaAlert({ estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo })
+          : await TelegramService.sendLowStockAlert({ estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo });
     }
 
-    return {
-      kind: "THROTTLED",
-      tipo: tipoAtual,
-      quantidade: ei.quantidade,
-      minimo,
-      telegram,
-    };
+    return { kind: "THROTTLED", tipo: tipoAtual, quantidade: ei.quantidade, minimo, telegram };
   }
 
   if (!abaixoMinimo && ei.alertaativo) {
     await prisma.$transaction([
       prisma.alertaEstoque.updateMany({
-        where: {
-          estoqueId,
-          itemId,
-          resolvido: false,
-          tipo: { in: ["ABAIXO_MINIMO", "RUPTURA"] },
-        },
+        where: { estoqueId, itemId, resolvido: false, tipo: { in: ["ABAIXO_MINIMO", "RUPTURA"] } },
         data: { resolvido: true, resolvedAt: new Date() },
       }),
       prisma.estoqueItem.update({
@@ -355,11 +283,7 @@ export async function checarLimitesEGerenciarAlertas(
     ]);
 
     const telegram = await TelegramService.sendLowStockResolved({
-      estoqueId,
-      itemId,
-      itemNome,
-      quantidade: ei.quantidade,
-      minimo,
+      estoqueId, itemId, itemNome, quantidade: ei.quantidade, minimo,
     });
 
     return { kind: "RESOLVED", quantidade: ei.quantidade, minimo, telegram };

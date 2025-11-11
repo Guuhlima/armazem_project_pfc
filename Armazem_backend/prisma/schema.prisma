@@ -526,37 +526,3 @@ model ContagemCiclicaLancamento {
   @@index([contadoEm])
   @@map("contagem_lancamentos")
 }
-
-model LogEvent {
-  id              String    @id @default(uuid()) @db.Uuid
-  type            LogType
-  action          LogAction
-  success         Boolean   @default(true)
-  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
-  actorUserId     String?   @db.Uuid
-  actorName       String?
-  ip              String?
-  userAgent       String?
-  httpMethod      String?
-  route           String?
-  correlationId   String?
-  message         String?
-  errorCode       String?
-  errorMessage    String?
-  itemId          Int?
-  estoqueId       Int?
-  transferenciaId Int?
-  botMessageId    String?
-  botChatId       String?
-
-  metadata Json? @db.JsonB
-
-  @@index([type, action, createdAt])
-  @@index([createdAt])
-  @@index([actorUserId, createdAt])
-  @@index([itemId, createdAt])
-  @@index([estoqueId, createdAt])
-  @@index([route, createdAt])
-
-  @@map("log_event")
-}

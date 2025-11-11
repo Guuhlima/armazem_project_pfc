@@ -19,7 +19,6 @@ async function main() {
     { code: "count:input", desc: "Lançar contagem/reconte" },
     { code: "count:cancel", desc: "Cancelar tarefa de contagem" },
     { code: "count:generate", desc: "Gerar tarefas de contagem (cron/manual)" },
-    { code: "logs:read", desc: "Realizar leitura de logs" },
   ];
   await prisma.permission.createMany({
     data: permissions,
@@ -58,7 +57,6 @@ async function main() {
       "count:input",
       "count:cancel",
       "count:generate",
-      "logs:read",
     ],
     ADMIN: [
       "equipment:read",
@@ -73,7 +71,6 @@ async function main() {
       "count:input",
       "count:cancel",
       "count:generate",
-      "logs:read",
     ],
     "USER-EQUIP-TRANSFER": [
       "equipment:read",

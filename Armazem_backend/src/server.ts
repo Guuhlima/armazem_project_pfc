@@ -29,7 +29,6 @@ import { startSchedulerLoop } from "./workers/scheduler";
 import { startConsumer } from "./workers/consumer-transfer";
 import { startCyclicCountWorker } from "./workers/contagem-ciclica.worker";
 import { startTelegram, stopTelegram } from "./service/telegram.service";
-import { logsRoutes } from "./routes/logs.routes";
 
 dotenv.config();
 
@@ -55,7 +54,7 @@ async function bootstrap() {
       cb(new Error("CORS not allowed"), false);
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
     credentials: true,
   });
 
@@ -88,11 +87,10 @@ async function bootstrap() {
       return reply.code(401).send({ error: "unauthorized" });
     }
   });
-
+  
   await app.register(authRoutes);
   await app.register(resetPasswordRoutes);
   await app.register(usuariosRoutes, { prefix: "/user" });
-  await app.register(logsRoutes, { prefix: "/logs" });
 
   await app.register(async (r) => {
     r.addHook("onRequest", r.authenticate);
@@ -143,6 +141,7 @@ async function bootstrap() {
   });
 
   await app.register(agendamentoRoutes);
+
   startConsumer();
   startSchedulerLoop();
   startCyclicCountWorker();
@@ -150,7 +149,7 @@ async function bootstrap() {
   app.addHook("onClose", async () => {
     try {
       await stopTelegram();
-    } catch {}
+    } catch { }
   });
 
   await app.ready();

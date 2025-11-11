@@ -1,7 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { MovQueryType } from '../schemas/movimentacoes.schema';
-import { parseDateLoose, truncBucket } from 'utils/utils';
+import { parseDateLoose, truncBucket } from '../utils/utils';
 
 type LinhaAgg = {
   itemId: number;
