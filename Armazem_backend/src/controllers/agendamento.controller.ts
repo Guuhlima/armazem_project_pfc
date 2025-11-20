@@ -5,8 +5,7 @@ import {
   AgendamentoParamsType,
 } from '../schemas/agendamento.schema';
 import { TelegramService } from '../service/telegram.service';
-import { executarAgendamento, executarPendentes } from "../service/agendamento.service";
-import { checarLimitesEGerenciarAlertas } from '../service/estoque-alertas.service';
+import { executarAgendamento, executarPendentes, autoReposicaoAutomatica } from "../service/agendamento.service";
 
 // Criar angedamento de transferencia futuras (validando dados e notifica)
 export async function createAgendamento(
@@ -199,9 +198,13 @@ export async function runAutoRepos(
     if (!Number.isFinite(estoqueId) || !Number.isFinite(itemId)) {
       return reply.code(400).send({ error: 'estoqueId e itemId são obrigatórios' });
     }
-    const result = await checarLimitesEGerenciarAlertas(estoqueId, itemId);
+
+    const result = await autoReposicaoAutomatica(estoqueId, itemId);
+
     return reply.send({ ok: true, result });
   } catch (e: any) {
-    return reply.code(500).send({ error: e?.message ?? 'Falha ao rodar auto-reposição' });
+    return reply
+      .code(500)
+      .send({ error: e?.message ?? 'Falha ao rodar auto-reposição' });
   }
 }

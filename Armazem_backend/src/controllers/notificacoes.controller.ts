@@ -6,6 +6,7 @@ import { TelegramService } from '../service/telegram.service'
 type EstoqueOnly = { estoqueId: string }
 type UpsertBody = { chatId?: string }
 
+// Listar notificçaões
 export async function listNotifications(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id)
@@ -31,6 +32,7 @@ export async function listNotifications(req: FastifyRequest, reply: FastifyReply
   }
 }
 
+// Mostrar notificações não lidas
 export async function unreadCount(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id)
@@ -44,6 +46,7 @@ export async function unreadCount(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// Marcar notificação como lida
 export async function markRead(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -64,6 +67,7 @@ export async function markRead(
   }
 }
 
+// Marcar todas notificações como lidas
 export async function markAllRead(req: FastifyRequest, reply: FastifyReply) {
   try {
     const userId = Number((req.user as any)?.id)
@@ -80,6 +84,7 @@ export async function markAllRead(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// Enviar notificação para o telegram
 export const getTelegramNotifyForMe: RouteHandler<{ Params: EstoqueOnly }> = async (req, reply) => {
   try {
     const usuarioId = Number((req.user as any)?.id)
@@ -140,6 +145,7 @@ export const upsertTelegramNotifyForMe: RouteHandler<{ Params: EstoqueOnly; Body
     }
   }
 
+  // Enviar teste de mensagem para o telegram
 export const testTelegramNotifyForMe: RouteHandler<{ Params: EstoqueOnly }> = async (req, reply) => {
   try {
     const usuarioId = Number((req.user as any)?.id)
@@ -159,11 +165,10 @@ export const testTelegramNotifyForMe: RouteHandler<{ Params: EstoqueOnly }> = as
     }
 
     const text =
-      `✅ Teste de notificação do estoque #${estoqueId} ` +
+      `Teste de notificação do estoque #${estoqueId} ` +
       `para o usuário #${usuarioId} em ` +
       new Date().toLocaleString('pt-BR')
 
-    // Usa escape automático (MarkdownV2) para evitar 400 do Telegram
     await TelegramService.safeSendPlain(row.chatId, text)
 
     return reply.send({ ok: true })

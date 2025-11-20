@@ -65,3 +65,8 @@ export async function cancelarTarefa(id: number, motivo?: string): Promise<Servi
   const { data } = await api.post(`/counting/${id}/cancel`, { motivo });
   return data;
 }
+
+export async function gerarContagemCiclica() {
+  const { data } = await api.post('/counting/generate');
+  return data as { criadas?: number };
+}

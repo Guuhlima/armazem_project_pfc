@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { syncUserRolesToRedis } from '../lib/rbac-sync';
 
+// Valida se usuario é super admin
 async function isSuperAdmin(userId: number) {
   const u = await prisma.usuario.findFirst({
     where: { id: userId, roles: { some: { role: { nome: 'SUPER-ADMIN' } } } },
@@ -9,6 +10,8 @@ async function isSuperAdmin(userId: number) {
   });
   return !!u;
 }
+
+// Valida se o usuario no estoque é admin
 async function isStockAdmin(userId: number, estoqueId: number) {
   const v = await prisma.usuarioEstoque.findUnique({
     where: { usuarioId_estoqueId: { usuarioId: userId, estoqueId } },
@@ -17,6 +20,7 @@ async function isStockAdmin(userId: number, estoqueId: number) {
   return v?.role === 'ADMIN';
 }
 
+// Mostra requisições de acesso
 export async function listRequests(req: FastifyRequest, reply: FastifyReply) {
   try {
     const status = (req.query as any)?.status as 'PENDING'|'APPROVED'|'REJECTED'|undefined;
@@ -34,6 +38,7 @@ export async function listRequests(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+// Mostra requisão de acesso por id
 export async function getRequestById(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
   try {
     const id = Number(req.params.id);
@@ -49,6 +54,7 @@ export async function getRequestById(req: FastifyRequest<{ Params: { id: string 
   }
 }
 
+// Aprovar requisição de acesso ao armazem
 export async function approveRequest(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -123,6 +129,7 @@ export async function approveRequest(
   }
 }
 
+// Rejeita requisição de acesso ao armazem
 export async function rejectRequest(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
   try {
     const approverId = Number((req.user as any)?.id);

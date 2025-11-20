@@ -25,6 +25,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Separator } from '@/components/ui/separator';
 import { useIsClient } from '@/hooks/useIsClient';
 import { toast } from 'sonner';
+import { useSearchParams } from 'next/navigation';
 
 type View =
   | "inicio"
@@ -120,7 +121,9 @@ function Segmented({
 }
 
 const TransferDashboardPage = () => {
-  const [view, setView] = useState<View>("inicio");
+  const searchParams = useSearchParams();
+  const initialView = (searchParams.get("view") as View) || "inicio";
+  const [view, setView] = useState<View>(initialView);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { logout, hasPermission } = useAuth();
   const isClient = useIsClient();
@@ -189,9 +192,8 @@ const TransferDashboardPage = () => {
       />
 
       <main
-        className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${
-          sidebarCollapsed ? "ml-16" : "ml-64"
-        }`}
+        className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${sidebarCollapsed ? "ml-16" : "ml-64"
+          }`}
         role="main"
       >
         <div className="max-w-6xl mx-auto space-y-6">

@@ -11,10 +11,15 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type Estoque = { id: number; nome: string };
 type SugLote = { lote_id: number; codigo: string; validade: string | null; saldo: number };
+type ItemEstoque = {
+  id: number;
+  nome: string;
+};
 
 export default function SaidaForm() {
-  const [tab, setTab] = useState<'FEFO'|'SERIAL'>('FEFO');
+  const [tab, setTab] = useState<'FEFO' | 'SERIAL'>('FEFO');
   const [estoques, setEstoques] = useState<Estoque[]>([]);
+  const [itens, setItens] = useState<ItemEstoque[]>([]);
   const [itemId, setItemId] = useState<number | ''>('');
   const [estoqueId, setEstoqueId] = useState<number | ''>('');
   const [quantidade, setQuantidade] = useState<number | ''>('');
@@ -37,8 +42,7 @@ export default function SaidaForm() {
     })();
   }, [hasPermission]);
 
-  // --- Preview FEFO (igual ao back): ignora vencidos, caminha em ordem e calcula "usar" ---
-  const hojeYmd = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+  const hojeYmd = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 
   async function carregarSugestoes() {
     if (!itemId || !estoqueId) return setSugestoes([]);
@@ -54,14 +58,42 @@ export default function SaidaForm() {
 
   useEffect(() => { carregarSugestoes(); }, [itemId, estoqueId]);
 
+  useEffect(() => {
+    if (!estoqueId) {
+      setItens([]);
+      setItemId('');
+      return;
+    }
+
+    (async () => {
+      try {
+        const response = await api.get(`/stockmovi/visualizar/${estoqueId}/itens`);
+
+        console.log("DEBUG resposta itens:", response.data);
+
+        const itensNormalizados = response.data.map((row: any) => ({
+          id: row.itemId ?? row.item?.id,
+          nome: row.item?.nome ?? `Item #${row.itemId}`,
+        }));
+
+        setItens(itensNormalizados);
+
+      } catch (err) {
+        console.error(err);
+        setItens([]);
+        setItemId('');
+      }
+    })();
+  }, [estoqueId]);
+
   const preview = useMemo(() => {
     let restante = Number(quantidade || 0);
     const hoje = hojeYmd();
     return (sugestoes || [])
       .filter(l => {
-        if (!l.validade) return true;               // NULLS LAST no back
-        const v = new Date(l.validade); v.setHours(0,0,0,0);
-        return v >= hoje;                            // espelha assertValidadeOk
+        if (!l.validade) return true;
+        const v = new Date(l.validade); v.setHours(0, 0, 0, 0);
+        return v >= hoje;
       })
       .map(l => {
         const saldo = Number(l.saldo);
@@ -80,14 +112,12 @@ export default function SaidaForm() {
     itemId && estoqueId && quantidade && Number(quantidade) > 0 && Number(quantidade) <= totalDisp
   );
 
-  // Mapa para mostrar código dos lotes no popup
   const mapLote = useMemo(() => {
     const m = new Map<number, { codigo: string; validade: string | null }>();
     sugestoes.forEach(l => m.set(l.lote_id, { codigo: l.codigo, validade: l.validade }));
     return m;
   }, [sugestoes]);
 
-  // --- Submits ---
   async function onSubmitFEFO(e: React.FormEvent) {
     e.preventDefault();
     if (!podeEnviarFEFO) return;
@@ -140,21 +170,39 @@ export default function SaidaForm() {
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
-        <Button type="button" variant={tab==='FEFO'?'default':'outline'} onClick={()=>setTab('FEFO')}>Saída FEFO (LOTE)</Button>
-        <Button type="button" variant={tab==='SERIAL'?'default':'outline'} onClick={()=>setTab('SERIAL')}>Saída por SERIAL</Button>
+        <Button type="button" variant={tab === 'FEFO' ? 'default' : 'outline'} onClick={() => setTab('FEFO')}>Saída FEFO (LOTE)</Button>
+        <Button type="button" variant={tab === 'SERIAL' ? 'default' : 'outline'} onClick={() => setTab('SERIAL')}>Saída por SERIAL</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label>Item ID</Label>
-          <Input type="number" placeholder="ex: 10"
-            value={itemId} onChange={e=>setItemId(e.target.value ? Number(e.target.value) : '')} />
+          <Label>Item</Label>
+          <select
+            className="w-full border rounded px-3 py-2 mt-1 dark:bg-zinc-800 dark:border-zinc-700"
+            value={itemId}
+            onChange={e => setItemId(e.target.value ? Number(e.target.value) : '')}
+            disabled={!estoqueId || itens.length === 0}
+          >
+            <option value="">
+              {!estoqueId
+                ? 'Selecione primeiro o estoque'
+                : itens.length === 0
+                  ? 'Nenhum item neste estoque'
+                  : 'Selecione um item'}
+            </option>
+
+            {itens.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nome} (#{i.id})
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <Label>Estoque</Label>
           <select
             className="w-full border rounded px-3 py-2 mt-1 dark:bg-zinc-800 dark:border-zinc-700"
-            value={estoqueId} onChange={e=>setEstoqueId(e.target.value ? Number(e.target.value) : '')}
+            value={estoqueId} onChange={e => setEstoqueId(e.target.value ? Number(e.target.value) : '')}
           >
             <option value="">Selecione</option>
             {estoques.map(e => <option key={e.id} value={e.id}>{e.nome} (#{e.id})</option>)}
@@ -167,7 +215,7 @@ export default function SaidaForm() {
           <div>
             <Label>Quantidade a retirar</Label>
             <Input type="number" placeholder="ex: 25"
-              value={quantidade} onChange={e=>setQuantidade(e.target.value ? Number(e.target.value) : '')} />
+              value={quantidade} onChange={e => setQuantidade(e.target.value ? Number(e.target.value) : '')} />
             <p className="text-xs text-muted-foreground mt-1">
               Disponível (considerando validade): <b>{totalDisp}</b>
             </p>
@@ -207,7 +255,7 @@ export default function SaidaForm() {
           <Button type="submit" disabled={loading || !podeEnviarFEFO} className="w-full">
             {loading ? 'Gerando saída...' : 'Gerar saída FEFO'}
           </Button>
-          {!podeEnviarFEFO && Number(quantidade||0) > 0 && (
+          {!podeEnviarFEFO && Number(quantidade || 0) > 0 && (
             <p className="text-xs text-red-500 mt-1">
               Quantidade solicitada maior que a disponível (considerando validade).
             </p>
@@ -217,7 +265,7 @@ export default function SaidaForm() {
         <form onSubmit={onSubmitSerial} className="space-y-4">
           <div>
             <Label>Serial</Label>
-            <Input placeholder="ex: SN-0001" value={serialNumero} onChange={e=>setSerialNumero(e.target.value)} />
+            <Input placeholder="ex: SN-0001" value={serialNumero} onChange={e => setSerialNumero(e.target.value)} />
           </div>
           <Button type="submit" disabled={loadingSerial || !itemId || !estoqueId || !serialNumero} className="w-full">
             {loadingSerial ? 'Gerando saída...' : 'Gerar saída por SERIAL'}

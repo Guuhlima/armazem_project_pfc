@@ -4,7 +4,13 @@ import { Contagens } from "../../components/Contagem";
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ContagensPage() {
-  const { user } = useAuth();
+  const { user, hasPermission, ready } = useAuth();
+
+  if (!ready) return null;
+
   const userId = user?.id ?? 0;
-  return <Contagens userId={userId} />;
+
+  const canGenerate = hasPermission('count:generate')
+
+  return <Contagens userId={userId} canGenerate={canGenerate} />;
 }

@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma';
 type Body = Static<typeof EquipamentoBodySchema>;
 type Params = Static<typeof EquipamentoParamsSchema>;
 
+// Cadastrar novos equipamentos
 export async function cadastrarEquipamento(
   req: FastifyRequest<{ Body: Body }>,
   reply: FastifyReply
@@ -33,6 +34,7 @@ export async function cadastrarEquipamento(
   }
 }
 
+// Visualizar todos equipamentos (Refletido pelo warehouse)
 export async function visualizarEquipamentos(req: FastifyRequest, reply: FastifyReply) {
   try {
     const { warehouses } = (req.query ?? {}) as { warehouses?: string | string[] };
@@ -72,6 +74,7 @@ export async function visualizarEquipamentos(req: FastifyRequest, reply: Fastify
   }
 }
 
+// Visualizar equipamentos por ID
 export async function visualizarEquipamentosPorId(req: FastifyRequest<{ Params: Params }>, reply: FastifyReply) {
   try {
     const { id } = req.params;
@@ -92,6 +95,7 @@ export async function visualizarEquipamentosPorId(req: FastifyRequest<{ Params: 
   }
 }
 
+// Editar equipamentos
 export async function editarEquipamento(
   req: FastifyRequest<{ Body: { nome?: string; quantidade?: number; data?: string | null }; Params: { id: string } }>,
   reply: FastifyReply
@@ -120,6 +124,7 @@ export async function editarEquipamento(
   }
 }
 
+// Deletar um equipamento
 export async function deletarEquipamento(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply

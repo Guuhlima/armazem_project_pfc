@@ -14,6 +14,8 @@ import type { Equipamento } from "@/types/equipamento";
 import { RequestWarehouseModal } from "../components/RequestWarehouseModal";
 import { Separator } from "@/components/ui/separator";
 import { FilterEquipamentos } from "../components/FilterEquipamentos";
+import { CountStatus, listTarefas } from "@/services/contagens";
+import { ContagemModal } from "./components/ContagemModal";
 
 type BackendEquip = {
   id: number;
@@ -38,12 +40,13 @@ const Home = () => {
   const [openReq, setOpenReq] = useState(false);
   const [filters, setFilters] = useState<Filters>({});
   const [selectedId, setSelectedId] = useState<number | null>(null);
-
-  // edição/exclusão
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState<Equipamento | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [contagemCiclica, setContagemCiclica] = useState(0);
+  const [alertouContagem, setAlertouContagem] = useState(false);
+  const [modalContagemOpen, setModalContagemOpen] = useState(false);
 
   const router = useRouter();
   const { logout, user } = useAuth();
@@ -57,7 +60,11 @@ const Home = () => {
   const warehousesParam = useMemo(
     () => linkedWarehouseIds.join(","),
     [linkedWarehouseIds]
-  );
+  )
+
+  function irParaContagemCiclica() {
+    router.push("/transfer?view=contagemCiclica");
+  }
 
   useEffect(() => {
     (async () => {
@@ -136,6 +143,42 @@ const Home = () => {
       return true;
     });
   }, [equipamentos, filters]);
+
+  useEffect(() => {
+    let cancelado = false;
+
+    async function checarContagens() {
+      try {
+        const tarefas = await listTarefas("PENDING" as CountStatus);
+        if (cancelado) return;
+
+        setContagemCiclica(tarefas.length)
+
+      } catch (err) {
+        console.error("Erro ao buscar contagens ciclicas", err);
+      }
+    }
+
+    checarContagens();
+
+    const intervalId = setInterval(checarContagens, 60_000);
+
+    return () => {
+      cancelado = true;
+      clearInterval(intervalId);
+    }
+  })
+
+  useEffect(() => {
+    if (contagemCiclica > 0 && !alertouContagem) {
+      setModalContagemOpen(true);
+      setAlertouContagem(true);
+    }
+
+    if (contagemCiclica === 0 && alertouContagem) {
+      setAlertouContagem(true);
+    }
+  }, [contagemCiclica, alertouContagem])
 
   const handleSelect = (item: Equipamento) => setSelectedId(item.id);
 
@@ -237,9 +280,8 @@ const Home = () => {
         />
 
         <main
-          className={`transition-all duration-300 p-6 pt-4 space-y-8 ${
-            collapsed ? "ml-16" : "ml-60"
-          }`}
+          className={`transition-all duration-300 p-6 pt-4 space-y-8 ${collapsed ? "ml-16" : "ml-60"
+            }`}
         >
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -250,6 +292,21 @@ const Home = () => {
             </p>
           </div>
 
+          <div>
+            {contagemCiclica > 0 && (
+              <div className="mt-3 mb-2 rounded-md border border-yellow-400 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 flex items-center justify-between">
+                <span>
+                  Você tem <strong>{contagemCiclica}</strong> contagens cíclicas pendentes
+                </span>
+                <button
+                  className="text-sm font-medium underline"
+                  onClick={irParaContagemCiclica}
+                >
+                  Ir para contagem
+                </button>
+              </div>
+            )}
+          </div>
           <Separator className="bg-zinc-200 dark:bg-zinc-700/50" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -289,9 +346,8 @@ const Home = () => {
 
             <Card
               onClick={handleCardClick}
-              className={`bg-white/90 dark:bg-zinc-900/70 border border-blue-500/10 dark:border-blue-500/20 shadow-sm ${
-                isLinked ? "hover:border-blue-500/30 cursor-pointer" : ""
-              }`}
+              className={`bg-white/90 dark:bg-zinc-900/70 border border-blue-500/10 dark:border-blue-500/20 shadow-sm ${isLinked ? "hover:border-blue-500/30 cursor-pointer" : ""
+                }`}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
@@ -453,6 +509,15 @@ const Home = () => {
           </div>
         </div>
       )}
+      <ContagemModal
+        open={modalContagemOpen}
+        quantidade={contagemCiclica}
+        onClose={() => setModalContagemOpen(false)}
+        onIrParaContagem={() => {
+          setModalContagemOpen(false);
+          router.push("/transfer?view=contagemCiclica")
+        }}
+      />
     </div>
   );
 };

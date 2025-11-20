@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import bcrypt from 'bcrypt';
 import { generateToken, sha256, sendEmail } from '../lib/resetPassword';
 
+// Solicita o reset de senha 
 export async function solicitarResetSenha(
   req: FastifyRequest<{ Body: { email: string } }>,
   reply: FastifyReply
@@ -61,6 +62,7 @@ export async function solicitarResetSenha(
   }
 }
 
+// Valida token de reset de senha enviado no email do usuario
 export async function validarTokenReset(
   req: FastifyRequest<{ Body: { token: string } }>,
   reply: FastifyReply
@@ -86,7 +88,7 @@ export async function validarTokenReset(
   }
 }
 
-
+// Confirma o reset de senha do usuario
 export async function confirmarResetSenha(
   req: FastifyRequest<{ Body: { token: string; novaSenha: string } }>,
   reply: FastifyReply

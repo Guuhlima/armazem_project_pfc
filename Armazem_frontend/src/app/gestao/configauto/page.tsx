@@ -127,39 +127,102 @@ export default function ReposicaoAutoPage() {
       if (!estoqueId || !itemId) {
         throw new Error('Selecione um estoque e um item.');
       }
+
       const destId = Number(estoqueId);
       const itId = Number(itemId);
-      const { data } = await api.patch(`/estoques/${destId}/itens/${itId}/auto`, {});
-      const result = data?.result ?? data ?? {};
-      const created = !!result.created;
-      const origemId: number | null = result.origemId ?? null;
-      const quantidade: number | null = result.quantidade ?? null;
-      const agendamentoId: number | null = result.agendamentoId ?? null;
-      const reason: string | null = result.reason ?? null;
 
-      if (created) {
-        const html = `
-          <div style="text-align:left">
-            <div><b>Item:</b> ${itemNome(itId)} (ID ${itId})</div>
-            <div><b>Origem:</b> ${estoqueNome(origemId ?? undefined)} (ID ${origemId ?? '—'})</div>
-            <div><b>Destino:</b> ${estoqueNome(destId)} (ID ${destId})</div>
-            <div><b>Quantidade:</b> ${quantidade}</div>
-            <div><b>Agendamento #</b>${agendamentoId}</div>
-          </div>`;
-        await fire({ icon: 'success', title: 'Auto-reposição criada', html, confirmButtonText: 'Ok' });
-      } else {
-        const html = `
-          <div style="text-align:left">
-            <div><b>Item:</b> ${itemNome(itId)} (ID ${itId})</div>
-            <div><b>Destino:</b> ${estoqueNome(destId)} (ID ${destId})</div>
-            <div><b>Motivo:</b> ${reason ?? 'Nenhuma ação'}</div>
-          </div>`;
-        await fire({ icon: 'info', title: 'Sem criação de agendamento', html, confirmButtonText: 'Entendi' });
+      const { data } = await api.patch(
+        `/estoques/${destId}/itens/${itId}/auto`,
+        { estoqueId: destId, itemId: itId }
+      );
+
+      const {
+        ok,
+        acionado,
+        reason,
+        agendamentosCriados = [],
+        execResultados = [],
+        faltando,
+      } = data ?? {};
+
+      if (!ok) {
+        const msgBase = reason ?? 'Falha na auto-reposição';
+        const extra =
+          typeof faltando === 'number' && faltando > 0
+            ? `\nAinda faltam ${faltando} unidade(s) para atingir o mínimo.`
+            : '';
+        await fire({
+          icon: 'error',
+          title: 'Auto-reposição não concluída',
+          text: msgBase + extra,
+        });
+        return;
       }
+
+      if (!acionado) {
+        const html = `
+        <div style="text-align:left">
+          <div><b>Item:</b> ${itemNome(itId)} (ID ${itId})</div>
+          <div><b>Destino:</b> ${estoqueNome(destId)} (ID ${destId})</div>
+          <div><b>Situação:</b> ${reason ?? 'Nenhuma ação necessária.'}</div>
+          ${typeof faltando === 'number' && faltando > 0
+            ? `<div><b>Ainda faltando:</b> ${faltando} unidade(s)</div>`
+            : ''
+          }
+        </div>
+      `;
+        await fire({
+          icon: 'info',
+          title: 'Sem criação de agendamentos',
+          html,
+          confirmButtonText: 'Entendi',
+        });
+        return;
+      }
+
+      const linhasExec =
+        execResultados.length > 0
+          ? execResultados
+            .map((r: any) => {
+              const status = r.ok ? 'OK' : (r.reason || 'Falha');
+              const transf = r.transferenciaId
+                ? ` (Transf. #${r.transferenciaId})`
+                : '';
+              return `<li>Agendamento #${r.id}: <b>${status}</b>${transf}</li>`;
+            })
+            .join('')
+          : '';
+
+      const html = `
+      <div style="text-align:left">
+        <div><b>Item:</b> ${itemNome(itId)} (ID ${itId})</div>
+        <div><b>Destino:</b> ${estoqueNome(destId)} (ID ${destId})</div>
+        <div><b>Agendamentos criados:</b> ${agendamentosCriados.length ? agendamentosCriados.join(', ') : '—'
+        }</div>
+        ${linhasExec
+          ? `<div style="margin-top:8px"><b>Execução:</b><ul style="margin:4px 0 0 18px">${linhasExec}</ul></div>`
+          : ''
+        }
+        ${typeof faltando === 'number' && faltando > 0
+          ? `<div style="margin-top:8px"><b>Ainda faltando:</b> ${faltando} unidade(s) para atingir o mínimo.</div>`
+          : ''
+        }
+      </div>
+    `;
+
+      await fire({
+        icon: 'success',
+        title: 'Auto-reposição executada',
+        html,
+        confirmButtonText: 'Ok',
+      });
 
       setRefreshKey(k => k + 1);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Falha ao rodar auto-reposição do par';
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        'Falha ao rodar auto-reposição do par';
       await fire({ icon: 'error', title: 'Erro', text: msg });
     } finally {
       setRunningPar(false);

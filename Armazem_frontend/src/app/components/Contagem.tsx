@@ -7,9 +7,10 @@ import {
   iniciarTarefa as apiIniciar,
   lancarContagem as apiLancar,
   cancelarTarefa as apiCancelar,
+  gerarContagemCiclica as apiGerarContagemCiclica, // 👈 NOVO
   type ContagemTarefa,
   type CountStatus,
-} from '../../services/contagens'; 
+} from '../../services/contagens';
 
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ function formatDate(dt?: string | null) {
   return new Date(dt).toLocaleString();
 }
 
-export function Contagens({ userId }: { userId: number }) {
+export function Contagens({ userId, canGenerate }: { userId: number; canGenerate: boolean }) {
   const qc = useQueryClient();
 
   const [status, setStatus] = useState<CountStatus>('PENDING');
@@ -77,6 +78,16 @@ export function Contagens({ userId }: { userId: number }) {
     onError: (e: any) => alert(e?.message ?? 'Falha ao cancelar'),
   });
 
+  // 👇 NOVO: mutation pra gerar contagem cíclica
+  const gerarMut = useMutation({
+    mutationFn: () => apiGerarContagemCiclica(),
+    onSuccess: (out) => {
+      qc.invalidateQueries({ queryKey: ['contagens'] });
+      alert(`Contagem cíclica gerada. Tarefas criadas: ${out?.criadas ?? 0}`);
+    },
+    onError: (e: any) => alert(e?.message ?? 'Falha ao gerar contagem cíclica'),
+  });
+
   const rows = useMemo(() => {
     const r = data ?? [];
     if (!q.trim()) return r;
@@ -105,7 +116,9 @@ export function Contagens({ userId }: { userId: number }) {
     return (
       <Card className="p-4">
         <div className="text-destructive">Erro ao carregar: {(error as any)?.message ?? 'desconhecido'}</div>
-        <Button className="mt-3" onClick={() => refetch()}>Tentar novamente</Button>
+        <Button className="mt-3" onClick={() => refetch()}>
+          Tentar novamente
+        </Button>
       </Card>
     );
   }
@@ -120,9 +133,15 @@ export function Contagens({ userId }: { userId: number }) {
         <div className="w-56">
           <label className="text-xs text-muted-foreground block mb-1">Status</label>
           <Select value={status} onValueChange={(v) => setStatus(v as CountStatus)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {STATUS_OPTS.map((s) => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+              {STATUS_OPTS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s.replace('_', ' ')}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -130,6 +149,16 @@ export function Contagens({ userId }: { userId: number }) {
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
             {isFetching ? 'Atualizando…' : 'Atualizar'}
           </Button>
+
+          {canGenerate && (
+            <Button
+              variant="secondary"
+              onClick={() => gerarMut.mutate()}
+              disabled={gerarMut.isPending}
+            >
+              {gerarMut.isPending ? 'Gerando…' : 'Gerar contagem cíclica'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -198,7 +227,6 @@ export function Contagens({ userId }: { userId: number }) {
           </tbody>
         </table>
       </div>
-
     </div>
   );
 }
@@ -220,17 +248,30 @@ function LancarDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">Lançar</Button>
+        <Button size="sm" variant="secondary">
+          Lançar
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Lançar {isRecount ? 'reconte' : 'contagem'}</DialogTitle>
           <DialogDescription>
-            Item: <b>{tarefa.item?.nome ?? `#${tarefa.itemId}`}</b> — Estoque: <b>{tarefa.estoque?.nome ?? `#${tarefa.estoqueId}`}</b>
+            Item: <b>{tarefa.item?.nome ?? `#${tarefa.itemId}`}</b> — Estoque:{' '}
+            <b>{tarefa.estoque?.nome ?? `#${tarefa.estoqueId}`}</b>
             <br />
             Saldo esperado no início: <b>{tarefa.systemQtyAtStart ?? 0}</b>
-            {typeof tarefa.toleranciaPct === 'number' && <> — Tolerância: <b>{tarefa.toleranciaPct}%</b></>}
-            {isRecount && <><br /><Badge variant="destructive">Reconte obrigatório por usuário diferente</Badge></>}
+            {typeof tarefa.toleranciaPct === 'number' && (
+              <>
+                {' '}
+                — Tolerância: <b>{tarefa.toleranciaPct}%</b>
+              </>
+            )}
+            {isRecount && (
+              <>
+                <br />
+                <Badge variant="destructive">Reconte obrigatório por usuário diferente</Badge>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -244,9 +285,14 @@ function LancarDialog({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button
-            onClick={() => { onConfirm(qtd); setOpen(false); }}
+            onClick={() => {
+              onConfirm(qtd);
+              setOpen(false);
+            }}
             disabled={busy || !Number.isFinite(qtd)}
           >
             {busy ? 'Salvando…' : 'Confirmar'}

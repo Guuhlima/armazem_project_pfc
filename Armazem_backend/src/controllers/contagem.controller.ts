@@ -25,12 +25,14 @@ export async function listarTarefasHandler(
 export async function gerarHandler(req: FastifyRequest, rep: FastifyReply) {
   try {
     const out = await gerarTarefasVencidas();
+    req.log.info({ out }, "[contagem] gerarTarefasVencidas resultado");
     return rep.send(out);
   } catch (err) {
     req.log.error({ err }, "[contagem] erro ao gerar tarefas");
     return rep.internalServerError("Falha ao gerar tarefas de contagem");
   }
 }
+
 
 // Iniciar tarefa
 export async function iniciarHandler(
@@ -70,7 +72,7 @@ export async function lancarHandler(
   }
 }
 
-// Cancelar tarefa
+// Cancelar tarefa de contagem
 export async function cancelarHandler(
   req: FastifyRequest<{ Params: { id: number }; Body: { motivo?: string } }>,
   rep: FastifyReply

@@ -14,6 +14,37 @@ function addDays(d: Date, days: number) {
   return x;
 }
 
+const DEFAULT_FREQ_DIAS = Number(process.env.CC_FREQ_DEFAULT_DIAS ?? 30);
+const DEFAULT_TOLERANCIA_PCT = Number(process.env.CC_TOLERANCIA_DEFAULT ?? 0);
+const DEFAULT_CONTAGEM_DUPLA = false;
+const DEFAULT_BLOQUEAR_MOV = false;
+
+async function ensurePoliticaForItem(
+  estoqueId: number,
+  itemId: number,
+  classeAbc?: AbcClasse | null
+) {
+  // 1) tenta achar alguma política existente
+  let politica = await resolvePolitica(estoqueId, itemId, classeAbc ?? undefined);
+  if (politica) return politica;
+
+  // 2) se não existir, cria política default para esse item específico
+  politica = await prisma.contagemCiclicaPolitica.create({
+    data: {
+      estoqueId,
+      itemId,
+      classeAbc: classeAbc ?? null,
+      ativa: true,
+      frequenciaDias: DEFAULT_FREQ_DIAS,
+      toleranciaPct: DEFAULT_TOLERANCIA_PCT,
+      contagemDupla: DEFAULT_CONTAGEM_DUPLA,
+      bloquearMov: DEFAULT_BLOQUEAR_MOV,
+    },
+  });
+
+  return politica;
+}
+
 /** Resolve a política aplicável (item > classe > default do estoque) */
 async function resolvePolitica(
   estoqueId: number,
@@ -43,18 +74,29 @@ export async function gerarTarefasVencidas() {
     include: { item: { select: { id: true } } },
   });
 
+  let total = itens.length;
+  let semPolitica = 0;
+  let naoPrecisam = 0;
   let criadas = 0;
 
+  console.log('[ContagemCiclica] Itens encontrados:', total);
+
   for (const it of itens) {
-    const politica = await resolvePolitica(
-      it.estoqueId,
-      it.itemId,
-      it.classeAbc as AbcClasse | undefined
-    );
-    if (!politica) continue;
+    const politica = await ensurePoliticaForItem(
+  it.estoqueId,
+  it.itemId,
+  it.classeAbc as AbcClasse | undefined
+);
+    if (!politica) {
+      semPolitica++;
+      continue;
+    }
 
     const precisa = !it.nextCountDueAt || it.nextCountDueAt <= now;
-    if (!precisa) continue;
+    if (!precisa) {
+      naoPrecisam++;
+      continue;
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.contagemCiclicaTarefa.create({
@@ -78,7 +120,14 @@ export async function gerarTarefasVencidas() {
     criadas++;
   }
 
-  return { ok: true, criadas };
+  console.log('[ContagemCiclica] resumo geração:', {
+    total,
+    semPolitica,
+    naoPrecisam,
+    criadas,
+  });
+
+  return { ok: true, criadas, total, semPolitica, naoPrecisam };
 }
 
 /** Lista tarefas (com filtros simples) */
@@ -130,6 +179,7 @@ export async function lancarContagem(
     const tarefa = await tx.contagemCiclicaTarefa.findUnique({
       where: { id: tarefaId },
     });
+
     if (
       !tarefa ||
       !["IN_PROGRESS", "RECOUNT_REQUIRED"].includes(tarefa.status)
@@ -137,7 +187,6 @@ export async function lancarContagem(
       return { ok: false, reason: "INVALID_STATUS_OR_NOT_FOUND" };
     }
 
-    // Regra: se for reconte, usuário deve ser diferente do 1º lançamento
     if (tarefa.status === "RECOUNT_REQUIRED") {
       const first = await tx.contagemCiclicaLancamento.findFirst({
         where: { tarefaId, tentativa: 1 },
@@ -161,7 +210,6 @@ export async function lancarContagem(
     const pct = base === 0 ? (diffAbs > 0 ? 100 : 0) : (diffAbs / base) * 100;
     const tol = tarefa.toleranciaPct ?? 0;
 
-    // Dentro da tolerância = fecha sem ajuste
     if (pct <= tol) {
       await tx.contagemCiclicaTarefa.update({
         where: { id: tarefaId },
@@ -177,7 +225,6 @@ export async function lancarContagem(
       return { ok: true, closed: true, adjusted: false };
     }
 
-    // Fora da tolerância + contagem dupla = exige reconte
     if ((tarefa.contagemDupla ?? false) && tentativa === 1) {
       await tx.contagemCiclicaTarefa.update({
         where: { id: tarefaId },
@@ -186,7 +233,6 @@ export async function lancarContagem(
       return { ok: true, recount: true, closed: false };
     }
 
-    // Gerar ajuste (delta para mais/para menos)
     const delta = quantidade - base;
 
     const mov = await tx.movEstoque.create({
@@ -198,6 +244,16 @@ export async function lancarContagem(
         tipoEvento: "AJUSTE_CC",
         referenciaTabela: "contagem_ciclica",
         referenciaId: tarefaId,
+      },
+    });
+
+    await tx.estoqueItem.updateMany({
+      where: {
+        estoqueId: tarefa.estoqueId,
+        itemId: tarefa.itemId,
+      },
+      data: {
+        quantidade,
       },
     });
 
@@ -213,11 +269,18 @@ export async function lancarContagem(
     });
 
     await bumpNextDueAt_tx(tx, tarefa);
-    return { ok: true, closed: true, adjusted: true };
+
+    return {
+      ok: true,
+      closed: true,
+      adjusted: true,
+      delta,
+      newQty: quantidade,
+    };
   });
 }
 
-/** Cancela uma tarefa (não mexe em saldo) */
+// Cancela uma tarefa (não mexe em saldo) 
 export async function cancelarTarefa(tarefaId: number, motivo?: string) {
   const t = await prisma.contagemCiclicaTarefa.findUnique({
     where: { id: tarefaId },
@@ -256,7 +319,7 @@ async function bumpNextDueAt_tx(tx: any, tarefa: any) {
   });
 }
 
-/** Utilitário: bloqueio de movimentação */
+// Utilitário: bloqueio de movimentação 
 export async function verificarBloqueioContagem(
   estoqueId: number,
   itemId: number

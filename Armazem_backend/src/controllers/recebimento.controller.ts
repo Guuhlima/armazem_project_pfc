@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma';
 
 type Body = Static<typeof RecebimentoBodySchema>;
 
+// Receber novos equipamentos ao armazem
 export async function receberEquipamento(
   req: FastifyRequest<{ Body: Body }>,
   reply: FastifyReply
