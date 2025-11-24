@@ -29,12 +29,15 @@ function cssVar(name: string) {
 }
 
 function useSwalTheme() {
-  const theme = useMemo(() => ({
-    background: cssVar('--card'),
-    color: cssVar('--foreground'),
-    confirmButtonColor: cssVar('--primary'),
-    cancelButtonColor: cssVar('--muted-foreground'),
-  }), []);
+  const theme = useMemo(
+    () => ({
+      background: cssVar('--card'),
+      color: cssVar('--foreground'),
+      confirmButtonColor: cssVar('--primary'),
+      cancelButtonColor: cssVar('--muted-foreground'),
+    }),
+    []
+  );
   const fire = (opts: any) =>
     Swal.fire({
       background: theme.background || undefined,
@@ -63,9 +66,9 @@ export default function ReposicaoAutoPage() {
   const { fire } = useSwalTheme();
 
   const estoqueNome = (id?: number) =>
-    estoques.find(e => e.id === id)?.nome ?? (id ? `Estoque #${id}` : '—');
+    estoques.find((e) => e.id === id)?.nome ?? (id ? `Estoque #${id}` : '—');
   const itemNome = (id?: number) =>
-    itens.find(i => i.id === id)?.nome ?? (id ? `Item #${id}` : '—');
+    itens.find((i) => i.id === id)?.nome ?? (id ? `Item #${id}` : '—');
 
   useEffect(() => {
     (async () => {
@@ -112,9 +115,10 @@ export default function ReposicaoAutoPage() {
         text: `Executados ${count} agendamentos com sucesso.`,
         confirmButtonText: 'Ok',
       });
-      setRefreshKey(k => k + 1);
+      setRefreshKey((k) => k + 1);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Falha ao executar pendentes';
+      const msg =
+        err?.response?.data?.error || err?.message || 'Falha ao executar pendentes';
       await fire({ icon: 'error', title: 'Erro', text: msg });
     } finally {
       setRunningPendentes(false);
@@ -140,33 +144,56 @@ export default function ReposicaoAutoPage() {
         ok,
         acionado,
         reason,
+        detalhe,
         agendamentosCriados = [],
         execResultados = [],
         faltando,
       } = data ?? {};
 
+      // --------- CASO FALHA HARD (ok = false) ----------
       if (!ok) {
-        const msgBase = reason ?? 'Falha na auto-reposição';
+        const msgBase =
+          reason === 'SEM_OUTROS_ESTOQUES_COM_ITEM'
+            ? 'Nenhum outro estoque possui esse item para auto-reposição.'
+            : reason === 'SEM_SALDO_SUFICIENTE_NOS_OUTROS_ESTOQUES'
+              ? 'Os outros estoques têm esse item, mas não têm saldo suficiente acima do mínimo.'
+              : reason === 'AUTO_DESATIVADO'
+                ? 'Auto-reposição está desativada para esse item neste estoque.'
+                : reason === 'ESTOQUE_OK'
+                  ? 'O estoque já está em condição adequada, nenhuma ação foi necessária.'
+                  : reason ?? 'Falha na auto-reposição';
+
         const extra =
           typeof faltando === 'number' && faltando > 0
-            ? `\nAinda faltam ${faltando} unidade(s) para atingir o mínimo.`
+            ? `\nAinda faltam ${faltando} unidade(s) para atingir o alvo configurado.`
             : '';
+
         await fire({
           icon: 'error',
           title: 'Auto-reposição não concluída',
-          text: msgBase + extra,
+          text: msgBase + (detalhe ? `\n${detalhe}` : '') + extra,
         });
         return;
       }
 
+      // --------- CASO OK MAS NÃO ACIONOU (nenhum agendamento criado) ----------
       if (!acionado) {
         const html = `
         <div style="text-align:left">
           <div><b>Item:</b> ${itemNome(itId)} (ID ${itId})</div>
           <div><b>Destino:</b> ${estoqueNome(destId)} (ID ${destId})</div>
-          <div><b>Situação:</b> ${reason ?? 'Nenhuma ação necessária.'}</div>
+          <div><b>Situação:</b> ${reason === 'ESTOQUE_OK'
+            ? 'Estoque já está dentro dos limites configurados.'
+            : reason === 'AUTO_DESATIVADO'
+              ? 'Auto-reposição está desativada para esse par.'
+              : reason ?? 'Nenhuma ação necessária.'
+          }</div>
+          ${detalhe
+            ? `<div style="margin-top:4px"><b>Detalhe:</b> ${detalhe}</div>`
+            : ''
+          }
           ${typeof faltando === 'number' && faltando > 0
-            ? `<div><b>Ainda faltando:</b> ${faltando} unidade(s)</div>`
+            ? `<div><b>Ainda faltando:</b> ${faltando} unidade(s) para atingir o alvo.</div>`
             : ''
           }
         </div>
@@ -180,11 +207,12 @@ export default function ReposicaoAutoPage() {
         return;
       }
 
+      // --------- CASO ACIONADO (teve agendamentos) ----------
       const linhasExec =
         execResultados.length > 0
           ? execResultados
             .map((r: any) => {
-              const status = r.ok ? 'OK' : (r.reason || 'Falha');
+              const status = r.ok ? 'OK' : r.reason || 'Falha';
               const transf = r.transferenciaId
                 ? ` (Transf. #${r.transferenciaId})`
                 : '';
@@ -199,12 +227,16 @@ export default function ReposicaoAutoPage() {
         <div><b>Destino:</b> ${estoqueNome(destId)} (ID ${destId})</div>
         <div><b>Agendamentos criados:</b> ${agendamentosCriados.length ? agendamentosCriados.join(', ') : '—'
         }</div>
+        ${reason || detalhe
+          ? `<div style="margin-top:4px"><b>Situação:</b> ${detalhe || reason}</div>`
+          : ''
+        }
         ${linhasExec
           ? `<div style="margin-top:8px"><b>Execução:</b><ul style="margin:4px 0 0 18px">${linhasExec}</ul></div>`
           : ''
         }
         ${typeof faltando === 'number' && faltando > 0
-          ? `<div style="margin-top:8px"><b>Ainda faltando:</b> ${faltando} unidade(s) para atingir o mínimo.</div>`
+          ? `<div style="margin-top:8px"><b>Ainda faltando:</b> ${faltando} unidade(s) para atingir o alvo configurado.</div>`
           : ''
         }
       </div>
@@ -217,7 +249,7 @@ export default function ReposicaoAutoPage() {
         confirmButtonText: 'Ok',
       });
 
-      setRefreshKey(k => k + 1);
+      setRefreshKey((k) => k + 1);
     } catch (err: any) {
       const msg =
         err?.response?.data?.error ||
@@ -258,7 +290,7 @@ export default function ReposicaoAutoPage() {
 
       <Sidebar
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(v => !v)}
+        onToggle={() => setSidebarCollapsed((v) => !v)}
         onLogout={() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
@@ -266,15 +298,21 @@ export default function ReposicaoAutoPage() {
         }}
       />
 
-      <main className={`relative z-10 transition-all duration-300 p-4 md:p-6 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+      <main
+        className={`relative z-10 transition-all duration-300 p-4 md:p-6 ${sidebarCollapsed ? 'ml-16' : 'ml-64'
+          }`}
+      >
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
           <div className="rounded-2xl border border-border dark:border-blue-800/50 bg-card/90 dark:bg-zinc-900/85 backdrop-blur-lg shadow-xl p-5 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground">Reabastecimento Interno Automático</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+                  Reabastecimento Interno Automático
+                </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Configure as regras por <b>item × estoque</b> e acompanhe os agendamentos automáticos.
+                  Configure as regras por <b>item × estoque</b> (mínimo, máximo, múltiplo, origem)
+                  e acompanhe os agendamentos automáticos entre armazéns.
                 </p>
               </div>
 
@@ -313,31 +351,46 @@ export default function ReposicaoAutoPage() {
                     <SelectValue placeholder="Selecione um estoque" />
                   </SelectTrigger>
                   <SelectContent>
-                    {estoques.map(e => (
+                    {estoques.map((e) => (
                       <SelectItem key={e.id} value={String(e.id)}>
                         {e.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Estoque destino da regra.</p>
+                <p className="text-xs text-muted-foreground">
+                  Estoque destino (onde a regra será aplicada).
+                </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="item">Item</Label>
-                <Select value={itemId} onValueChange={setItemId} disabled={!estoqueId || itens.length === 0}>
-                  <SelectTrigger id="item" className="bg-background disabled:opacity-60">
-                    <SelectValue placeholder={estoqueId ? 'Selecione um item' : 'Escolha um estoque primeiro'} />
+                <Select
+                  value={itemId}
+                  onValueChange={setItemId}
+                  disabled={!estoqueId || itens.length === 0}
+                >
+                  <SelectTrigger
+                    id="item"
+                    className="bg-background disabled:opacity-60"
+                  >
+                    <SelectValue
+                      placeholder={
+                        estoqueId ? 'Selecione um item' : 'Escolha um estoque primeiro'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {itens.map(i => (
+                    {itens.map((i) => (
                       <SelectItem key={i.id} value={String(i.id)}>
                         {i.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Item que terá auto-reposição.</p>
+                <p className="text-xs text-muted-foreground">
+                  Item que terá auto-reposição / equalização entre estoques.
+                </p>
               </div>
             </div>
           </motion.div>
@@ -351,15 +404,19 @@ export default function ReposicaoAutoPage() {
           >
             <Card className="border-0 bg-transparent">
               <CardContent className="p-5 md:p-6">
-                <h3 className="text-lg font-semibold mb-2">Configuração por Item × Estoque</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  Configuração por Item × Estoque
+                </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Defina <b>mínimo</b>, <b>máximo</b>, <b>múltiplos</b> e <b>origem preferida</b>, além de ativar o modo automático.
+                  Defina <b>mínimo</b>, <b>máximo</b>, <b>múltiplos</b> e{' '}
+                  <b>origem preferida</b>, além de ativar o modo automático. A auto-reposição
+                  tenta primeiro normalizar o mínimo e, quando possível, equalizar com os
+                  outros estoques.
                 </p>
                 <Separator className="my-4" />
                 <div
                   className="
                     rounded-xl border border-border bg-muted/30 p-4 md:p-6
-                    /* inputs/seleções/textarea internos seguem o tema */
                     [&_input]:w-full [&_select]:w-full [&_textarea]:w-full
                     [&_input]:rounded-md [&_select]:rounded-md [&_textarea]:rounded-md
                     [&_input]:border [&_select]:border [&_textarea]:border
@@ -376,11 +433,13 @@ export default function ReposicaoAutoPage() {
                     [&_select:focus-visible]:ring-offset-background
                     [&_textarea:focus-visible]:ring-offset-background
                     [&_input]:disabled:opacity-60 [&_select]:disabled:opacity-60 [&_textarea]:disabled:opacity-60
-                    /* tira sombras/brancão default do select em alguns browsers */
                     [&_select]:appearance-none [&_input]:shadow-none [&_select]:shadow-none [&_textarea]:shadow-none
                   "
                 >
-                  <AutoReposicaoForm estoqueId={Number(estoqueId) || 0} itemId={Number(itemId) || 0} />
+                  <AutoReposicaoForm
+                    estoqueId={Number(estoqueId) || 0}
+                    itemId={Number(itemId) || 0}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -391,7 +450,8 @@ export default function ReposicaoAutoPage() {
             <div>
               <h3 className="text-xl font-semibold">Agendamentos</h3>
               <p className="text-sm text-muted-foreground">
-                Monitoramento de agendamentos <b>automáticos</b> e <b>manuais</b>. Você pode cancelar enquanto estiver <i>PENDING</i>.
+                Monitoramento de agendamentos <b>automáticos</b> e <b>manuais</b>. Você pode
+                cancelar enquanto estiver <i>PENDING</i>.
               </p>
             </div>
 

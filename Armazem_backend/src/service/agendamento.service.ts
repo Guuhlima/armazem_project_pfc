@@ -22,7 +22,6 @@ export async function executarAgendamento(agendamentoId: number) {
   if (!item) return { ok: false, reason: "ITEM_NOT_FOUND" };
 
   try {
-    // === Se for SERIAL, não dá pra automatizar sem serial específico ===
     if (item.rastreioTipo === RastreioTipo.SERIAL) {
       await prisma.transferenciaAgendada.update({
         where: { id: ag.id },
@@ -34,36 +33,32 @@ export async function executarAgendamento(agendamentoId: number) {
       return { ok: false, reason: "SERIAL_NOT_SUPPORTED_AUTO" };
     }
 
-    // === Se for LOTE: quebrar por FEFO (menor validade primeiro) ===
     if (item.rastreioTipo === RastreioTipo.LOTE) {
       let restante = ag.quantidade;
       const picks = await sugerirFEFO(ag.itemId, ag.estoqueOrigemId!, 999);
 
       if (!picks?.length) throw new Error("Sem saldo por lote na origem");
 
-      // executa em transação: vários transf por lote até cobrir 'quantidade'
-      await prisma.$transaction(async () => {
-        for (const l of picks) {
-          if (restante <= 0) break;
-          const usar = Math.min(restante, Number(l.saldo));
-          if (usar <= 0) continue;
+      for (const l of picks) {
+        if (restante <= 0) break;
+        const usar = Math.min(restante, Number(l.saldo));
+        if (usar <= 0) continue;
 
-          await inv.transferir({
-            itemId: ag.itemId,
-            quantidade: usar,
-            origemId: ag.estoqueOrigemId!,
-            destinoId: ag.estoqueDestinoId,
-            loteId: l.lote_id,
-            referencia: { tabela: "transferenciaAgendada", id: ag.id },
-          });
+        await inv.transferir({
+          itemId: ag.itemId,
+          quantidade: usar,
+          origemId: ag.estoqueOrigemId!,
+          destinoId: ag.estoqueDestinoId,
+          loteId: l.lote_id,
+          referencia: { tabela: "transferenciaAgendada", id: ag.id },
+        });
 
-          restante -= usar;
-        }
+        restante -= usar;
+      }
 
-        if (restante > 0) {
-          throw new Error(`Saldo insuficiente na origem (faltam ${restante})`);
-        }
-      });
+      if (restante > 0) {
+        throw new Error(`Saldo insuficiente na origem (faltam ${restante})`);
+      }
 
       // cria um registro de transferência “sintético” para vínculo
       const created = await prisma.transferencia.create({
@@ -164,8 +159,26 @@ export async function executarPendentes(limit = 50) {
   return { ok: true, count: resultados.length, resultados };
 }
 
-export async function autoReposicaoAutomatica(estoqueDestinoId: number, itemId: number) {
-  // 1) Pega o EstoqueItem alvo (onde está baixo) usando a UNIQUE correta
+type AutoReposicaoResultado = {
+  ok: boolean;
+  acionado: boolean;
+  reason?: string;
+  detalhe?: string;
+
+  estoqueDestinoId?: number;
+  itemId?: number;
+
+  agendamentosCriados?: number[];
+  execResultados?: { id: number; ok: boolean; reason?: string; transferenciaId?: number }[];
+
+  faltando?: number;
+  necessario?: number;
+};
+
+export async function autoReposicaoAutomatica(
+  estoqueDestinoId: number,
+  itemId: number
+): Promise<AutoReposicaoResultado> {
   const alvo = await prisma.estoqueItem.findUnique({
     where: {
       itemId_estoqueId: {
@@ -187,6 +200,13 @@ export async function autoReposicaoAutomatica(estoqueDestinoId: number, itemId: 
     throw new Error("EstoqueItem não encontrado para esse estoque/item");
   }
 
+  // Nome do item para mensagem no Telegram
+  const item = await prisma.equipamento.findUnique({
+    where: { id: itemId },
+    select: { nome: true },
+  });
+  const itemNome = item?.nome ?? `Item#${itemId}`;
+
   // Se auto-reposição não estiver ativa, não faz nada
   if (!alvo.autoAtivo) {
     return {
@@ -196,23 +216,21 @@ export async function autoReposicaoAutomatica(estoqueDestinoId: number, itemId: 
     };
   }
 
-  const qtdAtual = Number(alvo.quantidade ?? 0);
-  const minimo = Number(alvo.minimo ?? 0);
+  const qtdDestAtual = Number(alvo.quantidade ?? 0);
+  const minimoDest = Number(alvo.minimo ?? 0) || 0;
+  const maximoDest = alvo.maximo != null ? Number(alvo.maximo) : null;
 
   // Se não estiver abaixo do mínimo, não faz nada
-  if (qtdAtual >= minimo) {
+  if (qtdDestAtual >= minimoDest) {
     return {
       ok: true,
       acionado: false,
       reason: "ESTOQUE_OK",
-      detalhe: `Quantidade atual ${qtdAtual} >= mínimo ${minimo}`,
+      detalhe: `Quantidade atual ${qtdDestAtual} >= mínimo ${minimoDest}`,
     };
   }
 
-  // Quanto precisa para chegar no mínimo
-  let necessario = minimo - qtdAtual;
-
-  // 2) Buscar outros estoques que têm esse item
+  // 2) Buscar outros estoques que têm esse item (fontes)
   const fontes = await prisma.estoqueItem.findMany({
     where: {
       itemId,
@@ -229,30 +247,97 @@ export async function autoReposicaoAutomatica(estoqueDestinoId: number, itemId: 
   });
 
   if (!fontes.length) {
+    try {
+      await TelegramService.sendLowStockAlert({
+        estoqueId: estoqueDestinoId,
+        itemId,
+        itemNome,
+        quantidade: qtdDestAtual,
+        minimo: minimoDest,
+      });
+    } catch {}
+
     return {
       ok: false,
       acionado: false,
       reason: "SEM_OUTROS_ESTOQUES_COM_ITEM",
-      necessario,
+      necessario: minimoDest - qtdDestAtual,
+    } as any;
+  }
+
+  // 3) Cálculo de equalização
+  const totalTodos =
+    qtdDestAtual +
+    fontes.reduce((acc, f) => acc + Number(f.quantidade ?? 0), 0);
+
+  const nEstoques = fontes.length + 1;
+  const idealIgual = Math.floor(totalTodos / nEstoques);
+
+  let alvoDest = Math.max(minimoDest, idealIgual);
+  if (maximoDest != null && alvoDest > maximoDest) {
+    alvoDest = maximoDest;
+  }
+
+  const alvoTotalNecessario = Math.max(0, alvoDest - qtdDestAtual);
+
+  if (alvoTotalNecessario <= 0) {
+    return {
+      ok: true,
+      acionado: false,
+      reason: "ESTOQUE_JA_EQUILIBRADO",
+      detalhe: `Quantidade atual ${qtdDestAtual} já é >= alvo ${alvoDest}`,
     };
   }
 
-  const agendamentosCriados: number[] = [];
+  const totalTransferivel = fontes.reduce((acc, f) => {
+    const qtdFonte = Number(f.quantidade ?? 0);
+    const minFonte = Number(f.minimo ?? 0);
+    const disponivel = qtdFonte - minFonte;
+    return disponivel > 0 ? acc + disponivel : acc;
+  }, 0);
 
-  // 3) Para cada estoque fonte, ver quanto dá pra tirar acima do mínimo
+  if (totalTransferivel <= 0) {
+    try {
+      await TelegramService.sendLowStockAlert({
+        estoqueId: estoqueDestinoId,
+        itemId,
+        itemNome,
+        quantidade: qtdDestAtual,
+        minimo: minimoDest,
+      });
+    } catch {}
+
+    return {
+      ok: false,
+      acionado: false,
+      reason: "SEM_SALDO_SUFICIENTE_NOS_OUTROS_ESTOQUES",
+      faltando: alvoTotalNecessario,
+    };
+  }
+
+  let restanteParaCobrir = Math.min(alvoTotalNecessario, totalTransferivel);
+  const restanteInicial = restanteParaCobrir;
+
+  const agendamentosCriados: number[] = [];
+  const execResultados: {
+    id: number;
+    ok: boolean;
+    reason?: string;
+    transferenciaId?: number;
+  }[] = [];
+
   for (const f of fontes) {
-    if (necessario <= 0) break;
+    if (restanteParaCobrir <= 0) break;
 
     const qtdFonte = Number(f.quantidade ?? 0);
     const minFonte = Number(f.minimo ?? 0);
+    const disponivel = qtdFonte - minFonte;
 
-    const disponivel = qtdFonte - minFonte; // só o que está acima do mínimo da origem
     if (disponivel <= 0) continue;
 
-    const transferir = Math.min(disponivel, necessario);
+    const transferir = Math.min(disponivel, restanteParaCobrir);
     if (transferir <= 0) continue;
 
-    // cria um agendamento de transferência (origem -> destino)
     const ag = await prisma.transferenciaAgendada.create({
       data: {
         itemId,
@@ -261,31 +346,54 @@ export async function autoReposicaoAutomatica(estoqueDestinoId: number, itemId: 
         estoqueDestinoId,
         usuarioId: SYSTEM_USER_ID,
         status: "PENDING",
-        executarEm: new Date(), // executa já
+        executarEm: new Date(),
         motivo: "AUTO_REPOSICAO",
         origemTipo: "AUTO",
       },
-      select: { id: true },
+      select: { id: true, executarEm: true },
     });
 
     agendamentosCriados.push(ag.id);
-    necessario -= transferir;
+    restanteParaCobrir -= transferir;
+
+    try {
+      await TelegramService.sendAgendamentoCreatedNotification({
+        agendamentoId: ag.id,
+        itemNome,
+        quantidade: transferir,
+        estoqueOrigemId: f.estoqueId,
+        estoqueDestinoId,
+        executarEm: ag.executarEm,
+        usuario: "system:auto",
+      });
+    } catch {}
   }
 
   if (!agendamentosCriados.length) {
+    try {
+      await TelegramService.sendLowStockAlert({
+        estoqueId: estoqueDestinoId,
+        itemId,
+        itemNome,
+        quantidade: qtdDestAtual,
+        minimo: minimoDest,
+      });
+    } catch {}
+
     return {
       ok: false,
       acionado: false,
       reason: "SEM_SALDO_SUFICIENTE_NOS_OUTROS_ESTOQUES",
-      faltando: necessario,
+      faltando: alvoTotalNecessario,
     };
   }
 
-  // 4) Executa os agendamentos criados usando sua lógica de transferência automática
-  const execResultados = [];
   for (const id of agendamentosCriados) {
     execResultados.push({ id, ...(await executarAgendamento(id)) });
   }
+
+  const totalTransferido = restanteInicial - restanteParaCobrir;
+  const faltando = Math.max(0, alvoTotalNecessario - totalTransferido);
 
   return {
     ok: true,
@@ -294,6 +402,7 @@ export async function autoReposicaoAutomatica(estoqueDestinoId: number, itemId: 
     itemId,
     agendamentosCriados,
     execResultados,
-    faltando: Math.max(necessario, 0),
+    faltando,
+    detalhe: `Alvo de destino: ${alvoDest}, transferido: ${totalTransferido}, faltando: ${faltando}`,
   };
 }

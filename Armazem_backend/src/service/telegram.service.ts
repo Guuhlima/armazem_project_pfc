@@ -339,6 +339,44 @@ export const TelegramService = {
     return sendToMany(html, dests);
   },
 
+  async sendAutoReposicaoPlannedNotification(p: {
+    estoqueOrigemId: number;
+    estoqueDestinoId: number;
+    itemId: number;
+    itemNome: string;
+    quantidadeTransferir: number;
+
+    qtdOrigAntes: number;
+    qtdDestAntes: number;
+    qtdOrigDepois: number;
+    qtdDestDepois: number;
+
+    minimoDestino: number;
+    faltando: number;
+    motivo?: string;
+  }): Promise<TelegramResult> {
+    if (!bot) return 'DISABLED';
+
+    const dests = await getDestsForOD(p.estoqueOrigemId, p.estoqueDestinoId);
+    if (!dests.length) return 'NO_DESTS';
+
+    const motivo = p.motivo ? escHtml(p.motivo) : 'Auto-reposição entre estoques';
+
+    const html =
+      `🤖 <b>Auto-reposição programada</b>\n` +
+      `<b>Motivo:</b> ${motivo}\n` +
+      `<b>Item:</b> ${escHtml(p.itemNome)} (ID ${p.itemId})\n` +
+      `<b>Quantidade a transferir:</b> ${p.quantidadeTransferir}\n` +
+      `<b>De:</b> #${p.estoqueOrigemId}  ( ${p.qtdOrigAntes} → ${p.qtdOrigDepois} )\n` +
+      `<b>Para:</b> #${p.estoqueDestinoId} ( ${p.qtdDestAntes} → ${p.qtdDestDepois} )\n` +
+      `<b>Mínimo destino:</b> ${p.minimoDestino}` +
+      (p.faltando > 0
+        ? `\n<b>Ainda faltando:</b> ${p.faltando} para atingir o alvo.`
+        : '');
+
+    return sendToMany(html, dests);
+  },
+
   async sendAccessRequestNotification(params: {
     estoqueId: number;
     solicitante: string;

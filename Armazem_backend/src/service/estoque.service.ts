@@ -182,33 +182,111 @@ export async function transferir({
   serialId?: number | null;
   referencia?: { tabela?: string; id?: number };
 }) {
+  if (quantidade <= 0) {
+    throw new Error('Quantidade inválida para transferência');
+  }
+
   const item = await getItemOrThrow(itemId);
   assertRastreio(item.rastreioTipo, loteId, serialId);
   await assertValidadeOk(loteId);
 
-  // Verifica saldo suficiente por lote (quando houver loteId)
+  // Se tiver loteId, você já está garantindo saldo por lote aqui
   if (loteId) {
     const lotes = await saldoPorLote(itemId, origemId);
-    const saldo = lotes.find(l => l.lote_id === loteId)?.saldo ?? 0;
-    if (saldo < quantidade) throw new Error(`Saldo insuficiente no lote ${loteId}: ${saldo}`);
+    const saldo = lotes.find((l) => l.lote_id === loteId)?.saldo ?? 0;
+    if (saldo < quantidade) {
+      throw new Error(`Saldo insuficiente no lote ${loteId}: ${saldo}`);
+    }
   }
 
   return prisma.$transaction(async (tx) => {
-    // OUT origem
+    const origemSnap = await tx.estoqueItem.findUnique({
+      where: {
+        itemId_estoqueId: {
+          itemId,
+          estoqueId: origemId,
+        },
+      },
+      select: { quantidade: true },
+    });
+
+    if (!origemSnap) {
+      throw new Error(
+        `Snapshot de estoque não encontrado para item ${itemId} em origem ${origemId}`
+      );
+    }
+
+    const saldoOrigem = Number(origemSnap.quantidade ?? 0);
+    if (saldoOrigem < quantidade) {
+      throw new Error(
+        `Saldo insuficiente na origem (snapshot). Disponível: ${saldoOrigem}, precisa: ${quantidade}`
+      );
+    }
+
+    await tx.estoqueItem.update({
+      where: {
+        itemId_estoqueId: {
+          itemId,
+          estoqueId: origemId,
+        },
+      },
+      data: {
+        quantidade: { decrement: quantidade },
+      },
+    });
+
+    const destinoSnap = await tx.estoqueItem.findUnique({
+      where: {
+        itemId_estoqueId: {
+          itemId,
+          estoqueId: destinoId,
+        },
+      },
+      select: { quantidade: true },
+    });
+
+    if (!destinoSnap) {
+      await tx.estoqueItem.create({
+        data: {
+          itemId,
+          estoqueId: destinoId,
+          quantidade,
+        },
+      });
+    } else {
+      await tx.estoqueItem.update({
+        where: {
+          itemId_estoqueId: {
+            itemId,
+            estoqueId: destinoId,
+          },
+        },
+        data: {
+          quantidade: { increment: quantidade },
+        },
+      });
+    }
+
     await tx.movEstoque.create({
       data: {
-        itemId, loteId: loteId ?? null, serialId: serialId ?? null,
-        estoqueOrigemId: origemId, quantidade,
+        itemId,
+        loteId: loteId ?? null,
+        serialId: serialId ?? null,
+        estoqueOrigemId: origemId,
+        quantidade,
         tipoEvento: 'TRANSF_OUT',
         referenciaTabela: referencia?.tabela ?? null,
         referenciaId: referencia?.id ?? null,
       },
     });
-    // IN destino
+
     await tx.movEstoque.create({
       data: {
-        itemId, loteId: loteId ?? null, serialId: serialId ?? null,
-        estoqueDestinoId: destinoId, quantidade,
+        itemId,
+        loteId: loteId ?? null,
+        serialId: serialId ?? null,
+        estoqueDestinoId: destinoId,
+        quantidade,
         tipoEvento: 'TRANSF_IN',
         referenciaTabela: referencia?.tabela ?? null,
         referenciaId: referencia?.id ?? null,

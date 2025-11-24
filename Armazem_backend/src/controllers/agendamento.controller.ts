@@ -190,18 +190,23 @@ export async function getAutoPendentes(
 
 // Rodar rotina de auto-reposição para um item em um estoque
 export async function runAutoRepos(
-  req: FastifyRequest<{ Body: { estoqueId: number; itemId: number } }>,
+  req: FastifyRequest<{ 
+    Params: { estoqueId: string; itemId: string }; 
+    Body: { estoqueId?: number; itemId?: number } 
+  }>,
   reply: FastifyReply
 ) {
   try {
-    const { estoqueId, itemId } = req.body || ({} as any);
-    if (!Number.isFinite(estoqueId) || !Number.isFinite(itemId)) {
+    const destId = Number(req.params.estoqueId ?? req.body?.estoqueId);
+    const itemId = Number(req.params.itemId ?? req.body?.itemId);
+
+    if (!Number.isFinite(destId) || !Number.isFinite(itemId)) {
       return reply.code(400).send({ error: 'estoqueId e itemId são obrigatórios' });
     }
 
-    const result = await autoReposicaoAutomatica(estoqueId, itemId);
+    const result = await autoReposicaoAutomatica(destId, itemId);
 
-    return reply.send({ ok: true, result });
+    return reply.send(result);
   } catch (e: any) {
     return reply
       .code(500)

@@ -104,23 +104,49 @@ export async function editarEquipamento(
     const { id } = req.params;
     const { nome, quantidade, data } = req.body;
 
-    const equipamentoEditado = await prisma.equipamento.update({
-      where: { id: Number(id) },
-      data: {
-        nome,
-        quantidade,
-        data: data != null ? dateOnlyToUTC(data) : undefined,
-      },
+    const equipamentoId = Number(id);
+
+    const equipamentoAtual = await prisma.equipamento.findUnique({
+      where: { id: equipamentoId },
     });
 
-    reply.send(equipamentoEditado);
+    if (!equipamentoAtual) {
+      return reply.status(404).send({ error: 'Equipamento não encontrado' });
+    }
+
+    const quantidadeNova =
+      typeof quantidade === 'number'
+        ? quantidade
+        : equipamentoAtual.quantidade ?? 0;
+
+    const dataEdit = data != null ? dateOnlyToUTC(data) : undefined;
+
+    const [equipamentoEditado] = await prisma.$transaction([
+      prisma.equipamento.update({
+        where: { id: equipamentoId },
+        data: {
+          nome,
+          quantidade: quantidadeNova,
+          data: dataEdit,
+        },
+      }),
+
+      prisma.estoqueItem.updateMany({
+        where: { itemId: equipamentoId },
+        data: {
+          quantidade: quantidadeNova,
+        },
+      }),
+    ]);
+
+    return reply.send(equipamentoEditado);
   } catch (error: any) {
     if (error.code === 'P2025') {
-      reply.status(404).send({ error: 'Equipamento não encontrado' });
-    } else {
-      console.error(error);
-      reply.status(500).send({ error: 'Erro ao editar equipamento' });
+      return reply.status(404).send({ error: 'Equipamento não encontrado' });
     }
+
+    console.error(error);
+    return reply.status(500).send({ error: 'Erro ao editar equipamento' });
   }
 }
 
