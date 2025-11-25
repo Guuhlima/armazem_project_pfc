@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { useIsClient } from '@/hooks/useIsClient';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
+import Footer from "@/app/components/Footer";
 
 type View =
   | "inicio"
@@ -159,10 +160,11 @@ const TransferDashboardPage = () => {
   const blockRestricted = isRestricted && !canManageStock;
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
+    <div className="min-h-screen relative overflow-x-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors flex flex-col">
 
+      {/* Fundo em grid, sempre atrás de tudo */}
       <div
-        className="fixed inset-0 z-0 animate-neon-grid"
+        className="fixed inset-0 -z-10 animate-neon-grid"
         style={{
           backgroundColor: 'transparent',
           backgroundImage: `
@@ -192,8 +194,7 @@ const TransferDashboardPage = () => {
       />
 
       <main
-        className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${sidebarCollapsed ? "ml-16" : "ml-64"
-          }`}
+        className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${sidebarCollapsed ? "ml-16" : "ml-64"} flex-1`}
         role="main"
       >
         <div className="max-w-6xl mx-auto space-y-6">
@@ -330,6 +331,10 @@ const TransferDashboardPage = () => {
           )}
         </div>
       </main>
+
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </div>
   );
 };

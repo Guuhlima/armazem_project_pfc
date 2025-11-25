@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
+import Footer from "@/app/components/Footer";
 
 type Estoque = { id: number; nome: string };
 type Equipamento = { id: number; nome: string };
@@ -263,7 +264,6 @@ export default function ReposicaoAutoPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
-      {/* grid neon de fundo (igual seu dashboard) */}
       <div
         className="fixed inset-0 z-0 animate-neon-grid"
         style={{
@@ -336,7 +336,6 @@ export default function ReposicaoAutoPage() {
             </div>
           </div>
 
-          {/* Filtros */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -395,7 +394,6 @@ export default function ReposicaoAutoPage() {
             </div>
           </motion.div>
 
-          {/* Form de Configuração */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -445,7 +443,6 @@ export default function ReposicaoAutoPage() {
             </Card>
           </motion.div>
 
-          {/* Agendamentos */}
           <section className="space-y-3">
             <div>
               <h3 className="text-xl font-semibold">Agendamentos</h3>
@@ -466,6 +463,9 @@ export default function ReposicaoAutoPage() {
           </section>
         </div>
       </main>
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </div>
   );
 }

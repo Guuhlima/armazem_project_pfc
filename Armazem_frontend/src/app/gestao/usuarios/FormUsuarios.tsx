@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Sidebar from 'app/components/Sidebar';
 import TableUsuario from './components/TableUsuarios';
 import { Card, CardContent } from '@/components/ui/card';
+import Footer from '@/app/components/Footer';
 
 const UsuariosPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -28,6 +29,9 @@ const UsuariosPage = () => {
           </CardContent>
         </Card>
       </main>
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </div>
   );
 };

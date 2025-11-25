@@ -104,7 +104,7 @@ export default function ReportsPage() {
         const items: Estoque[] = Array.isArray(data) ? data : "items" in data ? data.items : [];
         setEstoques(items);
         if (items[0]?.id) setEstoqueId(String(items[0].id));
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -126,8 +126,8 @@ export default function ReportsPage() {
       setLinhas(data.linhas ?? []);
 
       const totalEntradas = data.linhas?.reduce((acc, l) => acc + (l.entradas || 0), 0) ?? 0;
-      const totalSaidas   = data.linhas?.reduce((acc, l) => acc + (l.saidas || 0), 0) ?? 0;
-      const itensUnicos   = new Set(data.linhas?.map(l => l.itemId)).size;
+      const totalSaidas = data.linhas?.reduce((acc, l) => acc + (l.saidas || 0), 0) ?? 0;
+      const itensUnicos = new Set(data.linhas?.map(l => l.itemId)).size;
 
       setResumo({ entradas: totalEntradas, saidas: totalSaidas, itensUnicos });
     } catch (e) {
@@ -162,7 +162,7 @@ export default function ReportsPage() {
       { accessorKey: "estoqueNome", header: "Estoque" },
       { accessorKey: "itemNome", header: "Item" },
       { accessorKey: "entradas", header: "Entradas", cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>()}</span> },
-      { accessorKey: "saidas", header: "Saídas",   cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>()}</span> },
+      { accessorKey: "saidas", header: "Saídas", cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>()}</span> },
     ],
     []
   );
@@ -192,9 +192,9 @@ export default function ReportsPage() {
       if (!buckets.has(key)) buckets.set(key, { date: /^\d{4}-\d{2}-\d{2}$/.test(key) ? `${key}T00:00:00` : key.replace(" ", "T"), entradas: 0, saidas: 0 });
       const obj = buckets.get(key)!;
       obj.entradas += l.entradas;
-      obj.saidas   += l.saidas;
+      obj.saidas += l.saidas;
     }
-    return Array.from(buckets.values()).sort((a,b)=>a.date.localeCompare(b.date));
+    return Array.from(buckets.values()).sort((a, b) => a.date.localeCompare(b.date));
   }, [linhas]);
 
   const handleExport = () => {
@@ -329,7 +329,7 @@ export default function ReportsPage() {
                       labelFormatter={(v) => toBRDate(v)}
                     />
                     <Line type="monotone" dataKey="entradas" dot={false} strokeWidth={2} />
-                    <Line type="monotone" dataKey="saidas"   dot={false} strokeWidth={2} />
+                    <Line type="monotone" dataKey="saidas" dot={false} strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

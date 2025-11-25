@@ -6,15 +6,16 @@ import { CheckCircle2, XCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { approveRequest, getRequest, rejectRequest, type AccessRequest } from '@/services/requests';
 import { useAuth } from '@/contexts/AuthContext';
 import Swal from 'sweetalert2';
-import withReactContent from 'sweetalert2-react-content'; 
+import withReactContent from 'sweetalert2-react-content';
 import { CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Footer from '@/app/components/Footer';
 
 export default function AccessRequestPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { hasPermission } = useAuth();
-  const MySwal = withReactContent(Swal); 
+  const MySwal = withReactContent(Swal);
 
   const [reqData, setReqData] = useState<AccessRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,15 +48,15 @@ export default function AccessRequestPage() {
       setActing('approve');
       await approveRequest(Number(id));
       await load(); // Recarrega os dados para mostrar o status "APPROVED"
-      
+
       await MySwal.fire({
         title: 'Sucesso!',
         text: 'Solicitação aprovada e usuário vinculado.',
-        icon: 'success', 
+        icon: 'success',
         timer: 2000,
         showConfirmButton: false,
-        background: '#0b0b0b', 
-        color: '#e5e7eb'     
+        background: '#0b0b0b',
+        color: '#e5e7eb'
       });
 
     } catch (e: any) {
@@ -80,7 +81,7 @@ export default function AccessRequestPage() {
       await MySwal.fire({
         title: 'Solicitação Rejeitada',
         text: 'A solicitação foi rejeitada com sucesso.',
-        icon: 'success', 
+        icon: 'success',
         timer: 2000,
         showConfirmButton: false,
         background: '#0b0b0b',
@@ -103,7 +104,7 @@ export default function AccessRequestPage() {
   return (
     // Container principal
     <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
-      
+
       <div
         className="fixed inset-0 z-0 animate-starfield opacity-40 dark:opacity-70 bg-zinc-100 dark:bg-black"
         style={{
@@ -111,10 +112,10 @@ export default function AccessRequestPage() {
           backgroundSize: '50px 50px',
         }}
       />
-      
-      
-      <main className="relative z-10 transition-all duration-300 px-4 sm:px-8 py-12 flex justify-center bg-transparent ml-0 sm:ml-16 md:ml-60"> 
-        
+
+
+      <main className="relative z-10 transition-all duration-300 px-4 sm:px-8 py-12 flex justify-center bg-transparent ml-0 sm:ml-16 md:ml-60">
+
         <div className="w-full max-w-3xl">
           <button
             onClick={() => router.back()}
@@ -122,12 +123,12 @@ export default function AccessRequestPage() {
           >
             <ArrowLeft className="w-4 h-4" /> Voltar
           </button>
-          
+
           <div className="bg-card/90 dark:bg-card/85 backdrop-blur-lg border border-border dark:border-blue-800/50 shadow-xl rounded-xl overflow-hidden">
             <CardHeader className="p-6 border-b border-border dark:border-blue-800/40">
-                <h1 className="text-xl font-semibold text-foreground">Solicitação de Acesso</h1>
+              <h1 className="text-xl font-semibold text-foreground">Solicitação de Acesso</h1>
             </CardHeader>
-            
+
             <CardContent className="p-6">
               {loading ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -156,7 +157,7 @@ export default function AccessRequestPage() {
                       <Info label="Decidida em">{new Date(reqData.decidedAt).toLocaleString('pt-BR')}</Info>
                     )}
                   </div>
-                  
+
                   <div className="mb-6">
                     <div className="text-sm font-medium text-muted-foreground mb-1">Motivo da Solicitação</div>
                     <p className="text-base text-foreground whitespace-pre-wrap p-4 bg-muted/50 rounded-md border border-border dark:border-zinc-700/50">
@@ -169,7 +170,7 @@ export default function AccessRequestPage() {
                       <Button
                         onClick={doApprove}
                         disabled={acting !== null}
-                        className="bg-green-600 hover:bg-green-700 text-white" 
+                        className="bg-green-600 hover:bg-green-700 text-white"
                       >
                         {acting === 'approve' ? (
                           <>
@@ -184,7 +185,7 @@ export default function AccessRequestPage() {
                       <Button
                         onClick={doReject}
                         disabled={acting !== null}
-                        variant="destructive" 
+                        variant="destructive"
                       >
                         {acting === 'reject' ? (
                           <>
@@ -210,6 +211,9 @@ export default function AccessRequestPage() {
           </div>
         </div>
       </main>
+      <div className="relative z-10">
+        <Footer />
+      </div>
     </div>
   );
 }
