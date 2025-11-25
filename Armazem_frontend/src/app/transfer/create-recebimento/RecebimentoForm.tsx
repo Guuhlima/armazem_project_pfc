@@ -10,9 +10,11 @@ import withReactContent from 'sweetalert2-react-content';
 import { useAuth } from '@/contexts/AuthContext';
 
 type Estoque = { id: number; nome: string };
+type ItemEstoque = { id: number; nome: string };
 
 export default function RecebimentoForm() {
   const [estoques, setEstoques] = useState<Estoque[]>([]);
+  const [itens, setItens] = useState<ItemEstoque[]>([]);
   const [itemId, setItemId] = useState<number | ''>('');
   const [estoqueId, setEstoqueId] = useState<number | ''>('');
   const [quantidade, setQuantidade] = useState<number | ''>('');
@@ -35,6 +37,29 @@ export default function RecebimentoForm() {
       }
     })();
   }, [hasPermission]);
+
+  useEffect(() => {
+    if (!estoqueId) {
+      setItens([]);
+      setItemId('');
+      return;
+    }
+
+    (async () => {
+      try {
+        const response = await api.get(`/stockmovi/visualizar/${estoqueId}/itens`);
+        const itensNormalizados: ItemEstoque[] = (response.data || []).map((row: any) => ({
+          id: row.itemId ?? row.item?.id,
+          nome: row.item?.nome ?? `Item #${row.itemId}`,
+        }));
+        setItens(itensNormalizados);
+      } catch (err) {
+        console.error(err);
+        setItens([]);
+        setItemId('');
+      }
+    })();
+  }, [estoqueId]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,27 +89,56 @@ export default function RecebimentoForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Item por NOME */}
         <div>
-          <Label>Item ID</Label>
-          <Input type="number" placeholder="ex: 10"
-            value={itemId} onChange={(e)=>setItemId(e.target.value ? Number(e.target.value) : '')} />
+          <Label>Item</Label>
+          <select
+            className="w-full border rounded px-3 py-2 mt-1 dark:bg-zinc-800 dark:border-zinc-700"
+            value={itemId}
+            onChange={(e) => setItemId(e.target.value ? Number(e.target.value) : '')}
+            disabled={!estoqueId || itens.length === 0}
+          >
+            <option value="">
+              {!estoqueId
+                ? 'Selecione primeiro o estoque'
+                : itens.length === 0
+                  ? 'Nenhum item neste estoque'
+                  : 'Selecione um item'}
+            </option>
+            {itens.map(i => (
+              <option key={i.id} value={i.id}>
+                {i.nome} (#{i.id})
+              </option>
+            ))}
+          </select>
         </div>
+
+        {/* Estoque */}
         <div>
           <Label>Estoque</Label>
           <select
             className="w-full border rounded px-3 py-2 mt-1 dark:bg-zinc-800 dark:border-zinc-700"
-            value={estoqueId} onChange={(e)=>setEstoqueId(e.target.value ? Number(e.target.value) : '')}
+            value={estoqueId}
+            onChange={(e) => setEstoqueId(e.target.value ? Number(e.target.value) : '')}
           >
             <option value="">Selecione</option>
-            {estoques.map(e => <option key={e.id} value={e.id}>{e.nome} (#{e.id})</option>)}
+            {estoques.map(e => (
+              <option key={e.id} value={e.id}>
+                {e.nome} (#{e.id})
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
       <div>
         <Label>Quantidade</Label>
-        <Input type="number" placeholder="ex: 100"
-          value={quantidade} onChange={(e)=>setQuantidade(e.target.value ? Number(e.target.value) : '')} />
+        <Input
+          type="number"
+          placeholder="ex: 100"
+          value={quantidade}
+          onChange={(e) => setQuantidade(e.target.value ? Number(e.target.value) : '')}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -102,12 +156,13 @@ export default function RecebimentoForm() {
         </div>
       </div>
 
-      <Button type="submit" disabled={loading} className="w-full">
+      <Button type="submit" disabled={loading || !estoqueId || !itemId || !quantidade} className="w-full">
         {loading ? 'Enviando...' : 'Lançar entrada'}
       </Button>
 
       <p className="text-xs text-muted-foreground">
-        Itens <b>LOTE</b> exigem <code>loteCodigo</code>; itens <b>SERIAL</b> exigem <code>serialNumero</code> (geralmente quantidade = 1).
+        Itens <b>LOTE</b> podem exigir <code>loteCodigo</code>; itens <b>SERIAL</b> podem exigir <code>serialNumero</code> (normalmente quantidade = 1).  
+        As validações finais são feitas no backend.
       </p>
     </form>
   );

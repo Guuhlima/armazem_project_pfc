@@ -30,10 +30,6 @@ async function ensureSerial(itemId: number, numero: string, loteId?: number | nu
 function assertRastreio(itemRastreio: RastreioTipo, loteId?: number | null, serialId?: number | null) {
   if (itemRastreio === 'NONE' && (loteId || serialId))
     throw new Error('Item não usa lote/serial');
-  if (itemRastreio === 'LOTE' && !loteId)
-    throw new Error('Item exige loteId');
-  if (itemRastreio === 'SERIAL' && !serialId)
-    throw new Error('Item exige serialId');
 }
 
 async function assertValidadeOk(loteId?: number | null) {
@@ -137,17 +133,17 @@ export async function receber({
 
   const v = validade ? new Date(validade) : null;
 
-  if (item.rastreioTipo === 'LOTE' || (item.rastreioTipo === 'SERIAL' && loteCodigo)) {
-    if (!loteCodigo) throw new Error('loteCodigo obrigatório para itens com lote');
-    const lote = await ensureLote(itemId, loteCodigo, v);
-    loteId = lote.id;
-  }
+  // if (item.rastreioTipo === 'LOTE' || (item.rastreioTipo === 'SERIAL' && loteCodigo)) {
+  //   if (!loteCodigo) throw new Error('loteCodigo obrigatório para itens com lote');
+  //   const lote = await ensureLote(itemId, loteCodigo, v);
+  //   loteId = lote.id;
+  // }
 
-  if (item.rastreioTipo === 'SERIAL') {
-    if (!serialNumero) throw new Error('serialNumero obrigatório para itens SERIAL');
-    const serial = await ensureSerial(itemId, serialNumero, loteId ?? undefined);
-    serialId = serial.id;
-  }
+  // if (item.rastreioTipo === 'SERIAL') {
+  //   if (!serialNumero) throw new Error('serialNumero obrigatório para itens SERIAL');
+  //   const serial = await ensureSerial(itemId, serialNumero, loteId ?? undefined);
+  //   serialId = serial.id;
+  // }
 
   assertRastreio(item.rastreioTipo, loteId, serialId);
 

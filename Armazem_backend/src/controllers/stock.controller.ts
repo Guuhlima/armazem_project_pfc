@@ -423,7 +423,6 @@ export async function getEstoqueItemConfig(
   }
 }
 
-// PATCH /estoques/:estoqueId/itens/:itemId/auto
 export async function patchEstoqueItemAutoConfig(
   req: FastifyRequest<{
     Params: { estoqueId: string; itemId: string };
