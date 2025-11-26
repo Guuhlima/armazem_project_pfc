@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Mail, Lock, Package } from 'lucide-react';
-import { api, apiAuth } from '@/services/api'; 
-import { useIsClient } from '@/hooks/useIsClient'; 
+import { api, apiAuth } from '@/services/api';
+import { useIsClient } from '@/hooks/useIsClient';
 import Swal from 'sweetalert2';
 
 export default function Login() {
@@ -16,7 +16,7 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const isClient = useIsClient(); 
+  const isClient = useIsClient();
 
   if (!isClient) return null;
 
@@ -25,7 +25,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await apiAuth.post(
-        '/user/login', 
+        '/user/login',
         { email, senha }
       );
 
@@ -36,7 +36,7 @@ export default function Login() {
       // Salva no localStorage
       localStorage.setItem('accessToken', at);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
-      if (user) localStorage.setItem('user', JSON.stringify(user)); 
+      if (user) localStorage.setItem('user', JSON.stringify(user));
 
       api.defaults.headers.common.Authorization = `Bearer ${at}`;
 
@@ -50,42 +50,42 @@ export default function Login() {
 
       let title = 'Erro no Login';
       let text = 'Ocorreu um erro inesperado. Tente novamente.';
-      let icon: 'error' | 'warning' = 'error'; 
+      let icon: 'error' | 'warning' = 'error';
 
       // Verifica se é um erro da API (Axios)
       if (error.response) {
-          const status = error.response.status;
-          const data = error.response.data;
-          text = data?.error || data?.message || text; 
+        const status = error.response.status;
+        const data = error.response.data;
+        text = data?.error || data?.message || text;
 
-          if (status === 401) { // Credenciais Inválidas
-              title = 'Credenciais Inválidas';
-              icon = 'warning'; 
-              text = 'E-mail ou senha incorretos. Verifique seus dados.'; 
-          } else if (status === 400) { 
-              title = 'Requisição Inválida';
-              icon = 'warning';
-              text = `Dados inválidos: ${text}`;
-          } else if (status >= 500) { 
-              title = 'Erro no Servidor';
-              text = 'Ocorreu um problema no servidor. Tente novamente mais tarde.';
-          }
+        if (status === 401) { // Credenciais Inválidas
+          title = 'Credenciais Inválidas';
+          icon = 'warning';
+          text = 'E-mail ou senha incorretos. Verifique seus dados.';
+        } else if (status === 400) {
+          title = 'Requisição Inválida';
+          icon = 'warning';
+          text = `Dados inválidos: ${text}`;
+        } else if (status >= 500) {
+          title = 'Erro no Servidor';
+          text = 'Ocorreu um problema no servidor. Tente novamente mais tarde.';
+        }
       } else if (error.request) { // Erro de rede (não conseguiu conectar)
-          title = 'Erro de Conexão';
-          text = 'Não foi possível conectar ao servidor. Verifique sua rede.';
-      } else { 
-          text = error.message || text;
+        title = 'Erro de Conexão';
+        text = 'Não foi possível conectar ao servidor. Verifique sua rede.';
+      } else {
+        text = error.message || text;
       }
 
       Swal.fire({
-          title: title,
-          text: text,
-          icon: icon,
-          timer: 3000, 
-          showConfirmButton: false,
-          background: '#0b0b0b',
-          color: '#e5e7eb', 
-          customClass: { popup: 'rounded-xl' }
+        title: title,
+        text: text,
+        icon: icon,
+        timer: 3000,
+        showConfirmButton: false,
+        background: '#0b0b0b',
+        color: '#e5e7eb',
+        customClass: { popup: 'rounded-xl' }
       });
 
     } finally {

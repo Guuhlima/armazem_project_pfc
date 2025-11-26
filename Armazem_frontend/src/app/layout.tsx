@@ -5,7 +5,7 @@ import ReactQueryProvider from './providers/react-query';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
 export const metadata = {
-  title: 'Estoque App',
+  title: 'Armazem G3',
   description: 'Gerenciamento de Equipamentos',
 };
 
