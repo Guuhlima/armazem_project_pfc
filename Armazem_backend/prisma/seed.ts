@@ -82,7 +82,6 @@ async function main() {
     "USER-EQUIPAMENTOS": [
       "equipment:read",
       "stock:read",
-      "count:read",
     ],
     usuarioPadrão: [],
   };

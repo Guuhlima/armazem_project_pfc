@@ -133,29 +133,45 @@ export async function receber({
 
   const v = validade ? new Date(validade) : null;
 
-  // if (item.rastreioTipo === 'LOTE' || (item.rastreioTipo === 'SERIAL' && loteCodigo)) {
-  //   if (!loteCodigo) throw new Error('loteCodigo obrigatório para itens com lote');
-  //   const lote = await ensureLote(itemId, loteCodigo, v);
-  //   loteId = lote.id;
-  // }
+  if (loteCodigo) {
+    const lote = await ensureLote(itemId, loteCodigo, v);
+    loteId = lote.id;
+  }
 
-  // if (item.rastreioTipo === 'SERIAL') {
-  //   if (!serialNumero) throw new Error('serialNumero obrigatório para itens SERIAL');
-  //   const serial = await ensureSerial(itemId, serialNumero, loteId ?? undefined);
-  //   serialId = serial.id;
-  // }
+  if (item.rastreioTipo === 'SERIAL') {
+    if (!serialNumero) {
+      throw new Error('serialNumero obrigatório para itens SERIAL');
+    }
+    const serial = await ensureSerial(itemId, serialNumero, loteId ?? undefined);
+    serialId = serial.id;
+  }
 
   assertRastreio(item.rastreioTipo, loteId, serialId);
 
-  await criarMov({
-    itemId,
-    loteId,
-    serialId,
-    estoqueDestinoId: estoqueId,
-    quantidade,
-    tipoEvento: 'IN',
-    referenciaTabela: referencia?.tabela,
-    referenciaId: referencia?.id,
+  await prisma.$transaction(async (tx) => {
+    await tx.movEstoque.create({
+      data: {
+        itemId,
+        loteId: loteId ?? null,
+        serialId: serialId ?? null,
+        estoqueDestinoId: estoqueId,
+        quantidade,
+        tipoEvento: 'IN',
+        referenciaTabela: referencia?.tabela ?? null,
+        referenciaId: referencia?.id ?? null,
+      },
+    });
+
+    await tx.estoqueItem.upsert({
+      where: { itemId_estoqueId: { itemId, estoqueId } },
+      update: { quantidade: { increment: quantidade } },
+      create: { itemId, estoqueId, quantidade },
+    });
+
+    await tx.equipamento.update({
+      where: { id: itemId },
+      data: { quantidade: { increment: quantidade } },
+    });
   });
 
   return { ok: true };
@@ -299,11 +315,13 @@ export async function pickingFEFO({
   itemId,
   quantidadeSolicitada,
   referencia,
+  permitirVencidos
 }: {
   estoqueId: number;
   itemId: number;
   quantidadeSolicitada: number;
   referencia?: { tabela?: string; id?: number };
+  permitirVencidos?: boolean
 }) {
   const item = await getItemOrThrow(itemId);
 
@@ -317,7 +335,10 @@ export async function pickingFEFO({
   const movimentos: { loteId: number; qtd: number }[] = [];
 
   for (const l of escolhas) {
-    await assertValidadeOk(l.lote_id);
+    if (!permitirVencidos) {
+      await assertValidadeOk(l.lote_id);
+    }
+    
     if (restante <= 0) break;
     const usar = Math.min(restante, Number(l.saldo));
     if (usar > 0) {
@@ -328,10 +349,11 @@ export async function pickingFEFO({
 
   if (restante > 0) {
     const totalDisp = escolhas.reduce((s, x) => s + Number(x.saldo), 0);
-    throw new Error(`Saldo insuficiente: pedido=${quantidadeSolicitada}, disponível=${totalDisp}`);
+    throw new Error(
+      `Saldo insuficiente: pedido=${quantidadeSolicitada}, disponível=${totalDisp}`,
+    );
   }
 
-  // Gera saídas (uma por lote)
   await prisma.$transaction(async (tx) => {
     for (const m of movimentos) {
       await tx.movEstoque.create({
@@ -345,7 +367,26 @@ export async function pickingFEFO({
           referenciaId: referencia?.id ?? null,
         },
       });
+
+      await tx.estoqueItem.update({
+        where: {
+          itemId_estoqueId: {
+            itemId,
+            estoqueId,
+          },
+        },
+        data: {
+          quantidade: { decrement: m.qtd },
+        },
+      });
     }
+
+    await tx.equipamento.update({
+      where: { id: itemId },
+      data: {
+        quantidade: { decrement: quantidadeSolicitada },
+      },
+    });
   });
 
   return { ok: true, lotes: movimentos };
@@ -367,7 +408,9 @@ export async function saidaPorSerial({
   if (item.rastreioTipo !== 'SERIAL') throw new Error('Item não é SERIAL');
 
   const serial = await prisma.serial.findUnique({ where: { numero: serialNumero } });
-  if (!serial || serial.itemId !== itemId) throw new Error('Serial não encontrado para o item');
+  if (!serial || serial.itemId !== itemId) {
+    throw new Error('Serial não encontrado para o item');
+  }
 
   // Verifica se o serial está presente no estoque (saldo 1)
   const saldoSerial = await prisma.$queryRaw<{ saldo: number }[]>`
@@ -383,17 +426,45 @@ export async function saidaPorSerial({
   const saldo = Number(saldoSerial[0]?.saldo ?? 0);
   if (saldo <= 0) throw new Error('Serial não está disponível neste estoque');
 
+  // Validade do lote do serial, se houver
   await assertValidadeOk(serial.loteId ?? undefined);
 
-  await criarMov({
-    itemId,
-    serialId: serial.id,
-    loteId: serial.loteId ?? undefined,
-    estoqueOrigemId: estoqueId,
-    quantidade: 1,
-    tipoEvento: 'OUT',
-    referenciaTabela: referencia?.tabela,
-    referenciaId: referencia?.id,
+  // 🔥 Tudo em transação: movimento + snapshot + total do item
+  await prisma.$transaction(async (tx) => {
+    // 1) Movimento de saída
+    await tx.movEstoque.create({
+      data: {
+        itemId,
+        serialId: serial.id,
+        loteId: serial.loteId ?? null,
+        estoqueOrigemId: estoqueId,
+        quantidade: 1,
+        tipoEvento: 'OUT',
+        referenciaTabela: referencia?.tabela ?? null,
+        referenciaId: referencia?.id ?? null,
+      },
+    });
+
+    // 2) Snapshot do estoque (estoqueItem)
+    await tx.estoqueItem.update({
+      where: {
+        itemId_estoqueId: {
+          itemId,
+          estoqueId,
+        },
+      },
+      data: {
+        quantidade: { decrement: 1 },
+      },
+    });
+
+    // 3) Quantidade total na tabela equipamentos
+    await tx.equipamento.update({
+      where: { id: itemId },
+      data: {
+        quantidade: { decrement: 1 },
+      },
+    });
   });
 
   return { ok: true, serialId: serial.id };

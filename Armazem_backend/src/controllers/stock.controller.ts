@@ -351,12 +351,13 @@ export async function postPickingFEFO(
   req: FastifyRequest<{ Body: {
     estoqueId: number; itemId: number; quantidadeSolicitada: number;
     referencia?: { tabela?: string; id?: number };
+    permitirVencidos?: boolean;
   } }>,
   reply: FastifyReply
 ) {
   try {
-    const { estoqueId, itemId, quantidadeSolicitada, referencia } = req.body;
-    const r = await pickingFEFO({ estoqueId, itemId, quantidadeSolicitada, referencia });
+    const { estoqueId, itemId, quantidadeSolicitada, referencia, permitirVencidos } = req.body;
+    const r = await pickingFEFO({ estoqueId, itemId, quantidadeSolicitada, referencia, permitirVencidos });
     return reply.send(r);
   } catch (e: any) {
     return reply.code(400).send({ error: e?.message ?? 'Erro no picking FEFO' });

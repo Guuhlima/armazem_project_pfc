@@ -13,13 +13,14 @@ export async function cadastrarEquipamento(
   reply: FastifyReply
 ) {
   try {
-    const { nome, quantidade, data } = req.body;
+    const { nome, quantidade, data, rastreioTipo } = req.body;
 
     const novoEquipamento = await prisma.equipamento.create({
       data: {
         nome,
         quantidade,
         data: new Date(data),
+        rastreioTipo: rastreioTipo ?? 'NONE',
       },
     });
 
@@ -27,6 +28,7 @@ export async function cadastrarEquipamento(
       id: novoEquipamento.id,
       nome: novoEquipamento.nome,
       quantidade: novoEquipamento.quantidade,
+      rastreioTipo: novoEquipamento.rastreioTipo,
     });
   } catch (error) {
     console.error(error);
@@ -97,12 +99,20 @@ export async function visualizarEquipamentosPorId(req: FastifyRequest<{ Params: 
 
 // Editar equipamentos
 export async function editarEquipamento(
-  req: FastifyRequest<{ Body: { nome?: string; quantidade?: number; data?: string | null }; Params: { id: string } }>,
+  req: FastifyRequest<{
+    Body: {
+      nome?: string;
+      quantidade?: number;
+      data?: string | null;
+      rastreioTipo?: 'NONE' | 'LOTE' | 'SERIAL';
+    };
+    Params: { id: string };
+  }>,
   reply: FastifyReply
 ) {
   try {
     const { id } = req.params;
-    const { nome, quantidade, data } = req.body;
+    const { nome, quantidade, data, rastreioTipo } = req.body;
 
     const equipamentoId = Number(id);
 
@@ -128,6 +138,7 @@ export async function editarEquipamento(
           nome,
           quantidade: quantidadeNova,
           data: dataEdit,
+          rastreioTipo: rastreioTipo ?? equipamentoAtual.rastreioTipo,
         },
       }),
 
