@@ -17,6 +17,7 @@ declare module "fastify" {
       revokePermFromRole(role: Role, perm: Permission): Promise<void>;
       userHasPermission(userId: UserId, perm: Permission): Promise<boolean>;
       requirePerm(perm: Permission): (req: FastifyRequest) => Promise<void>;
+      requireAuth(): (req: FastifyRequest) => Promise<void>;
     };
   }
   interface FastifyRequest {
@@ -64,6 +65,15 @@ const rbacPlugin: FastifyPluginCallback = (fastify, _opts, done) => {
         const ok = await userHasPermission(uid, perm);
         if (!ok) {
           throw fastify.httpErrors.forbidden(`missing permission: ${perm}`);
+        }
+      };
+    },
+
+    requireAuth() {
+      return async (req: FastifyRequest) => {
+        const uid = (req.user as any)?.id;
+        if (uid == null) {
+          throw fastify.httpErrors.unauthorized('unauthorized');
         }
       };
     }

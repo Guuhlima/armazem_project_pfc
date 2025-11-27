@@ -32,7 +32,7 @@ function maskEmail(email: string, keep: number = 3, showDomain: boolean = true) 
 }
 
 const TableUsuario = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user, logout } = useAuth();
   const [openConfigId, setOpenConfigId] = useState<number | null>(null);
 
   const [rows, setRows] = useState<Usuario[]>([]);
@@ -42,6 +42,12 @@ const TableUsuario = () => {
   const isSuper = hasPermission(['SUPER-ADMIN']);
   const isAdmin = !isSuper && hasPermission(['ADMIN']);
 
+  const isRestrictedUser = !isSuper && !isAdmin && hasPermission([
+    'USER-EQUIP-TRANSFER',
+    'USER-EQUIPAMENTOS',
+    'usuarioPadrão',
+  ]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -49,7 +55,15 @@ const TableUsuario = () => {
       setLoading(true);
       try {
         const { data } = await api.get<Usuario[]>('/user/visualizar', { withCredentials: true });
-        if (!cancelled) setRows(Array.isArray(data) ? data : []);
+        if (cancelled) return;
+
+        let list = Array.isArray(data) ? data : [];
+
+        if (isRestrictedUser && user) {
+          list = list.filter((u) => u.id === user.id);
+        }
+
+        setRows(list);
       } catch (e) {
         if (!cancelled) {
           console.error(e);
@@ -62,26 +76,34 @@ const TableUsuario = () => {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [isRestrictedUser, user]);
 
   const canConfigure = useMemo(() => {
     return (target: Usuario) => {
-      if (isSuper) return true;
-      if (isAdmin) return true;
+      if (isSuper || isAdmin) return true;
+      if (isRestrictedUser && user) {
+        return target.id === user.id;
+      }
       return false;
     };
-  }, [isSuper, isAdmin]);
+  }, [isSuper, isAdmin, isRestrictedUser, user]);
 
   const canDeleteUser = useMemo(() => {
     return (target: Usuario) => {
       if (isSuper) return true;
+
       if (isAdmin) {
         const alvoEhSuper = (target.permissoes ?? []).includes('SUPER-ADMIN');
         return !alvoEhSuper;
       }
+
+      if (isRestrictedUser && user) {
+        return target.id === user.id;
+      }
+
       return false;
     };
-  }, [isSuper, isAdmin]);
+  }, [isSuper, isAdmin, isRestrictedUser, user]);
 
   const displayEmail = useCallback(
     (email: string) => (isSuper ? email : maskEmail(email, 3, true)),
@@ -133,6 +155,14 @@ const TableUsuario = () => {
         text: `"${nomeOuEmail}" foi removido com sucesso.`,
         confirmButtonText: 'OK',
       });
+
+      const deletingOwnAccount = alvo && user && alvo.id === user.id;
+
+      if (deletingOwnAccount) {
+        await logout?.();
+        window.location.href = '/';
+        return;
+      }
     } catch (error: any) {
       console.error(error);
       setRows(snapshot);

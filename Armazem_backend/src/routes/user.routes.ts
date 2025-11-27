@@ -22,7 +22,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     r.addHook("onRequest", r.authenticate);
 
     r.get("/visualizar", {
-      preHandler: [r.rbac.requirePerm("user:manage")],
+      preHandler: [r.rbac.requireAuth()],
       handler: visualizarUsuarios,
     });
 
@@ -40,7 +40,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
 
     r.delete("/deletar/:id", {
       schema: { params: UsuarioParamsSchema },
-      preHandler: [r.rbac.requirePerm("user:delete")],
+      preHandler: [r.rbac.requireAuth()],
       handler: deletarUsuarios,
     });
   });

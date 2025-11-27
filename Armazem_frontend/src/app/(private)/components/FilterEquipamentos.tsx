@@ -6,12 +6,19 @@ export type Filters = {
   nome?: string;
   qntMin?: number | '';
   qntMax?: number | '';
-  dataIni?: string; // yyyy-mm-dd
-  dataFim?: string; // yyyy-mm-dd
+  dataIni?: string;
+  dataFim?: string;
+  warehouseId?: number | '';
+};
+
+type WarehouseOption = {
+  id: number;
+  nome: string;
 };
 
 type Props = {
   nomesDisponiveis: string[];
+  warehousesDisponiveis: WarehouseOption[];
   value: Filters;
   onChange: (next: Filters) => void;
   onClear?: () => void;
@@ -19,6 +26,7 @@ type Props = {
 
 export const FilterEquipamentos: React.FC<Props> = ({
   nomesDisponiveis,
+  warehousesDisponiveis,
   value,
   onChange,
   onClear,
@@ -27,6 +35,28 @@ export const FilterEquipamentos: React.FC<Props> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="flex flex-col">
+        <label className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+          Armazém
+        </label>
+        <select
+          value={value.warehouseId ?? ''}
+          onChange={(e) =>
+            set({
+              warehouseId:
+                e.target.value === '' ? '' : Number(e.target.value),
+            })
+          }
+          className="h-9 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 text-sm"
+        >
+          <option value="">Todos</option>
+          {warehousesDisponiveis.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.nome}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="flex flex-col">
         <label className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Equipamento</label>
         <select

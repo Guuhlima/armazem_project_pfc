@@ -5,7 +5,7 @@ import bcrypt from "bcrypt";
 const prisma = new PrismaClient();
 
 async function main() {
-  // 1) Permissions (granulares)
+  // Permissions (granulares)
   const permissions = [
     { code: "equipment:read", desc: "Ler equipamentos" },
     { code: "equipment:manage", desc: "Criar/editar/excluir equipamentos" },
@@ -25,7 +25,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  // 2) Roles (reaproveita a tabela "permissoes" via model Role)
+  // Roles (reaproveita a tabela "permissoes" via model Role)
   const roles = [
     { nome: "SUPER-ADMIN" },
     { nome: "ADMIN" },
@@ -42,7 +42,7 @@ async function main() {
   const allRoles = await prisma.role.findMany();
   const roleIdByName = Object.fromEntries(allRoles.map((r) => [r.nome, r.id]));
 
-  // 3) Grants Role -> Permission
+  //  Grants Role -> Permission
   const grants: Record<string, string[]> = {
     "SUPER-ADMIN": [
       "equipment:read",
@@ -99,7 +99,7 @@ async function main() {
     }
   }
 
-  // 4) Usuários de exemplo (garante que existem, evita FK P2003)
+  // Usuários de exemplo (garante que existem, evita FK P2003)
   const adminHash = await bcrypt.hash("admin123", 10);
   const equipHash = await bcrypt.hash("equip123", 10);
 
@@ -115,7 +115,7 @@ async function main() {
     create: { email: "equip@local", nome: "Equip User", senha: equipHash },
   });
 
-  // 5) Vincular Roles aos usuários criados
+  // Vincular Roles aos usuários criados
   const superAdminRoleId = roleIdByName["SUPER-ADMIN"];
   const equipRoleId = roleIdByName["USER-EQUIPAMENTOS"];
 

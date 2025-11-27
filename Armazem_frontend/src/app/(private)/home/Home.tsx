@@ -32,6 +32,7 @@ type Filters = {
   qntMax?: number | "";
   dataIni?: string;
   dataFim?: string;
+  warehouseId?: number | "";
 };
 
 const Home = () => {
@@ -51,6 +52,15 @@ const Home = () => {
   const router = useRouter();
   const { logout, user, roles } = useAuth();
   const { loading, isLinked, names, refresh, warehouses } = useMyWarehouses();
+
+  const warehouseOptions = useMemo(
+    () =>
+      (warehouses || []).map((w) => ({
+        id: w.id,
+        nome: (w.nome ?? `Armazém ${w.id}`) as string,
+      })),
+    [warehouses]
+  );
 
   const isEquipamentosUser = useMemo(
     () =>
@@ -108,6 +118,7 @@ const Home = () => {
             nome: (e.nome ?? e.equipamento ?? "—").toString(),
             quantidade: e.quantidade ?? 0,
             data: dateStr,
+            warehouseId: e.warehouseId ?? undefined,
           };
         });
 
@@ -126,6 +137,14 @@ const Home = () => {
 
   const filteredEquipamentos = useMemo(() => {
     return equipamentos.filter((e) => {
+      if (
+        filters.warehouseId !== '' &&
+        filters.warehouseId != null &&
+        e.warehouseId !== Number(filters.warehouseId)
+      ) {
+        return false;
+      }
+
       if (filters.nome && e.nome !== filters.nome) return false;
 
       if (
@@ -149,6 +168,7 @@ const Home = () => {
       return true;
     });
   }, [equipamentos, filters]);
+
 
   useEffect(() => {
     if (isEquipamentosUser) {
@@ -425,6 +445,7 @@ const Home = () => {
             <Card className="bg-white/90 dark:bg-zinc-900/70 border border-blue-500/10 dark:border-blue-500/20 shadow-sm">
               <CardContent className="p-4">
                 <FilterEquipamentos
+                  warehousesDisponiveis={warehouseOptions}
                   nomesDisponiveis={nomesDisponiveis}
                   value={filters}
                   onChange={setFilters}

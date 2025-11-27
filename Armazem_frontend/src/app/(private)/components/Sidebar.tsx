@@ -51,21 +51,28 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       <nav className="flex-1 px-2 py-4 space-y-1">
         <button
           onClick={() => setOpenEquipamento(!openEquipamento)}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${
-            pathname.startsWith('/equipamento')
-              ? 'bg-blue-100 dark:bg-zinc-800 text-blue-500'
-              : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-          }`}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${pathname.startsWith('/equipamento')
+            ? 'bg-blue-100 dark:bg-zinc-800 text-blue-500'
+            : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
         >
           <Package className="w-4 h-4" />
           {!collapsed && <span className="flex-1 text-left">Equipamentos</span>}
-          {!collapsed && (openEquipamento ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
+          {!collapsed &&
+            (openEquipamento ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            ))}
         </button>
 
         {!collapsed && openEquipamento && (
           <div className="ml-6 space-y-1">
             {hasPermission('equipment:read') && (
-              <Link href="/equipamento/create" className={navItem(pathname, '/equipamento/create')}>
+              <Link
+                href="/equipamento/create"
+                className={navItem(pathname, '/equipamento/create')}
+              >
                 <Plus className="w-4 h-4" /> Criar
               </Link>
             )}
@@ -79,42 +86,52 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
           </Link>
         )}
 
-        {hasPermission('user:manage') && (
-          <>
-            <button
-              onClick={() => setOpenGestao(!openGestao)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${
-                pathname.startsWith('/gestao')
-                  ? 'bg-blue-100 dark:bg-zinc-800 text-blue-500'
-                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+        <>
+          <button
+            onClick={() => setOpenGestao(!openGestao)}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${pathname.startsWith('/gestao')
+              ? 'bg-blue-100 dark:bg-zinc-800 text-blue-500'
+              : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
               }`}
-            >
-              <Users className="w-4 h-4" />
-              {!collapsed && <span className="flex-1 text-left">Gestão</span>}
-              {!collapsed && (openGestao ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />)}
-            </button>
+          >
+            <Users className="w-4 h-4" />
+            {!collapsed && <span className="flex-1 text-left">Gestão</span>}
+            {!collapsed &&
+              (openGestao ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              ))}
+          </button>
 
-            {!collapsed && openGestao && (
-              <div className="ml-6 space-y-1">
-                <Link href="/gestao/usuarios" className={navItem(pathname, '/gestao/usuarios')}>
-                  <UserPlus className="w-4 h-4" /> Usuários
-                </Link>
-                {/* <Link href="/gestao/permissoes" className={navItem(pathname, '/gestao/permissoes')}>
-                  <Shield className="w-4 h-4" /> Permissões
-                </Link> */}
-                {/* <Link href="/gestao/solicitacoes" className={navItem(pathname, '/gestao/solicitacoes')}>
-                  <UserRoundCheck className="w-4 h-4" /> Solicitações
-                </Link> */}
-                <Link href="/gestao/relatorio" className={navItem(pathname, '/gestao/relatorio')}>
-                  <Clipboard className='w-4 h-4' /> Relatorio
-                </Link>
-                <Link href="/gestao/configauto" className={navItem(pathname, '/gestao/configauto')}>
-                  <Cog className='w-4 h-4' /> Configuração estoque
-                </Link>
-              </div>
-            )}
-          </>
-        )}
+          {!collapsed && openGestao && (
+            <div className="ml-6 space-y-1">
+              <Link
+                href="/gestao/usuarios"
+                className={navItem(pathname, '/gestao/usuarios')}
+              >
+                <UserPlus className="w-4 h-4" /> Usuários
+              </Link>
+
+              {hasPermission('user:manage') && (
+                <>
+                  <Link
+                    href="/gestao/relatorio"
+                    className={navItem(pathname, '/gestao/relatorio')}
+                  >
+                    <Clipboard className="w-4 h-4" /> Relatorio
+                  </Link>
+                  <Link
+                    href="/gestao/configauto"
+                    className={navItem(pathname, '/gestao/configauto')}
+                  >
+                    <Cog className="w-4 h-4" /> Configuração estoque
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+        </>
       </nav>
 
       <div className="px-4 py-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-3">
@@ -133,11 +150,10 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
 function navItem(pathname: string, href: string) {
   const isActive = pathname === href;
-  return `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${
-    isActive
-      ? 'bg-blue-100 dark:bg-zinc-800 text-blue-500'
-      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-  }`;
+  return `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all ${isActive
+    ? 'bg-blue-100 dark:bg-zinc-800 text-blue-500'
+    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+    }`;
 }
 
 export default Sidebar;

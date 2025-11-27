@@ -3,4 +3,5 @@ export interface Equipamento {
   nome: string;
   quantidade: number;
   data: string;
+  warehouseId?: number;
 }

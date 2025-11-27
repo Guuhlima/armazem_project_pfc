@@ -168,14 +168,43 @@ export default function ReportsPage() {
 
   const columns = useMemo<ColumnDef<Linha>[]>(
     () => [
-      { accessorKey: "bucket", header: "Bucket", cell: ({ getValue }) => <span>{formatBucket(getValue<string>())}</span> },
-      { accessorKey: "estoqueNome", header: "Estoque" },
-      { accessorKey: "itemNome", header: "Item" },
-      { accessorKey: "entradas", header: "Entradas", cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>()}</span> },
-      { accessorKey: "saidas", header: "Saídas", cell: ({ getValue }) => <span className="tabular-nums">{getValue<number>()}</span> },
+      {
+        accessorKey: "bucket",
+        header: "Bucket",
+        cell: ({ getValue }) => (
+          <span>{formatBucket(getValue<string>())}</span>
+        ),
+      },
+      {
+        accessorKey: "estoqueNome",
+        header: "Estoque",
+      },
+      {
+        accessorKey: "itemNome",
+        header: "Item",
+      },
+      {
+        accessorKey: "entradas",
+        header: "Entradas",
+        cell: ({ getValue }) => (
+          <span className="tabular-nums">
+            {getValue<number>()?.toLocaleString("pt-BR")}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "saidas",
+        header: "Saídas",
+        cell: ({ getValue }) => (
+          <span className="tabular-nums">
+            {getValue<number>()?.toLocaleString("pt-BR")}
+          </span>
+        ),
+      },
     ],
     []
   );
+
 
   const table = useReactTable({
     data: linhasFiltradas,
@@ -354,22 +383,30 @@ export default function ReportsPage() {
                   <thead className="sticky top-0 z-10 bg-background">
                     {table.getHeaderGroups().map((hg) => (
                       <tr key={hg.id}>
-                        {hg.headers.map((h) => (
-                          <th
-                            key={h.id}
-                            className="text-left font-medium px-3 py-2 select-none cursor-pointer"
-                            onClick={h.column.getToggleSortingHandler()}
-                            style={{ width: h.getSize() }}
-                          >
-                            <div className="flex items-center gap-2">
-                              {flexRender(h.column.columnDef.header, h.getContext())}
-                              {{ asc: "↑", desc: "↓" }[h.column.getIsSorted() as string]}
-                            </div>
-                          </th>
-                        ))}
+                        {hg.headers.map((h) => {
+                          const isNumeric = ["entradas", "saidas"].includes(h.column.id);
+                          return (
+                            <th
+                              key={h.id}
+                              className={`font-medium px-3 py-2 select-none cursor-pointer ${isNumeric ? "text-right" : "text-left"
+                                }`}
+                              onClick={h.column.getToggleSortingHandler()}
+                              style={{ width: h.getSize() }}
+                            >
+                              <div
+                                className={`flex items-center gap-2 ${isNumeric ? "justify-end" : ""
+                                  }`}
+                              >
+                                {flexRender(h.column.columnDef.header, h.getContext())}
+                                {{ asc: "↑", desc: "↓" }[h.column.getIsSorted() as string]}
+                              </div>
+                            </th>
+                          );
+                        })}
                       </tr>
                     ))}
                   </thead>
+
                 </table>
               </div>
 
@@ -386,15 +423,23 @@ export default function ReportsPage() {
                           className={vr.index % 2 ? "bg-muted/30" : ""}
                           style={{ transform: `translateY(${vr.start}px)` }}
                         >
-                          {row.getVisibleCells().map((cell) => (
-                            <td key={cell.id} className="px-3 py-2">
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
-                          ))}
+                          {row.getVisibleCells().map((cell) => {
+                            const isNumeric = ["entradas", "saidas"].includes(cell.column.id);
+                            return (
+                              <td
+                                key={cell.id}
+                                className={`px-3 py-2 ${isNumeric ? "text-right tabular-nums" : ""
+                                  }`}
+                              >
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
                   </tbody>
+
                 </table>
               </div>
             </CardContent>

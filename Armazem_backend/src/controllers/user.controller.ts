@@ -272,30 +272,59 @@ export async function editarUsuarios(
 }
 
 // Deletar usuarios
-export const deletarUsuarios = async (  req: FastifyRequest<{ Body: Body; Params: Params }>,
-  reply: FastifyReply) => {
+export const deletarUsuarios = async (
+  req: FastifyRequest<{ Body: Body; Params: Params }>,
+  reply: FastifyReply
+) => {
   try {
     const id = Number(req.params.id);
     if (Number.isNaN(id)) {
       return reply.status(400).send({ message: 'ID inválido' });
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.notificacao.deleteMany({ where: { userId: id } });
-      await tx.passwordResetToken.deleteMany({ where: { userId: id }});
-      await tx.usuario.delete({ where: { id } });
+    const existing = await prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true, email: true, nome: true },
     });
 
-    return reply.code(200).send('Sucesso ao deletar usuário');
+    if (!existing) {
+      return reply.status(404).send({ message: 'Usuário não encontrado.' });
+    }
+
+    await prisma.$transaction(async (tx) => {      
+      await tx.notificacao.deleteMany({ where: { userId: id } });
+      await tx.passwordResetToken.deleteMany({ where: { userId: id } });
+      await tx.usuarioRole.deleteMany({ where: { usuarioId: id } });
+      await tx.usuarioEstoque.deleteMany({ where: { usuarioId: id } });
+
+      await tx.usuario.update({
+        where: { id },
+        data: {
+          nome: 'Usuário Removido',
+          email: `anon-${id}@removed.local`,
+          // zera/limpa demais dados pessoais – ajuste conforme seu schema
+          // telefone: null,
+          // cpf: null,
+          // endereco: null,
+          // fotoUrl: null,
+          // qualquer outro campo pessoal
+        },
+      });
+    });
+
+    return reply.code(200).send('Usuário anonimizado com sucesso.');
   } catch (err: any) {
+    // como não estamos mais dando delete em usuario,
+    // o P2003 praticamente some daqui.
     if (err?.code === 'P2003') {
       return reply.status(409).send({
         message:
-          'Não foi possível excluir. Existem registros dependentes relacionados a este usuário.',
+          'Não foi possível concluir a operação. Existem registros dependentes relacionados a este usuário.',
         detalhe: err?.meta?.constraint,
       });
     }
+
     console.error(err);
-    return reply.status(500).send({ message: 'Erro ao excluir usuário.' });
+    return reply.status(500).send({ message: 'Erro ao processar exclusão de usuário.' });
   }
 };
