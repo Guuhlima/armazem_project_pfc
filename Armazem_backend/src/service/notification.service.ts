@@ -114,27 +114,31 @@ export const NotificationService = {
   }) {
     const s = params;
     const quandoFmt = new Intl.DateTimeFormat('pt-BR', {
-      dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo'
+      dateStyle: 'short',
+      timeStyle: 'short',
+      timeZone: 'America/Sao_Paulo',
     }).format(s.quando);
 
     const message =
       `${s.solicitante} solicitou acesso ao estoque #${s.estoqueId} em ${quandoFmt}` +
       (s.motivo ? ` (motivo: ${s.motivo})` : '');
 
-    const telegramText =
-      `🔐 *Nova solicitação de acesso ao estoque #${s.estoqueId}*
-      *Solicitante:* ${s.solicitante}
-      ${s.motivo ? `*Motivo:* ${s.motivo}\n` : ''}*ID:* ${s.solicitacaoId}
-      *Quando:* ${quandoFmt}
-    `;
-
     await this.notifyEstoqueAdmins(s.estoqueId, {
       type: 'access_request',
       title: 'Solicitação de acesso ao estoque',
       message,
       refId: s.solicitacaoId,
-      telegramText,
     });
+
+    const telegram = await TelegramService.sendAccessRequestNotification({
+      estoqueId: s.estoqueId,
+      solicitante: s.solicitante,
+      motivo: s.motivo,
+      solicitacaoId: s.solicitacaoId,
+      quando: s.quando,
+    });
+
+    console.log('[notifySolicitacaoAcesso] telegram result =', telegram);
   },
 };
 

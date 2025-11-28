@@ -296,26 +296,12 @@ export const deletarUsuarios = async (
       await tx.passwordResetToken.deleteMany({ where: { userId: id } });
       await tx.usuarioRole.deleteMany({ where: { usuarioId: id } });
       await tx.usuarioEstoque.deleteMany({ where: { usuarioId: id } });
-
-      await tx.usuario.update({
-        where: { id },
-        data: {
-          nome: 'Usuário Removido',
-          email: `anon-${id}@removed.local`,
-          // zera/limpa demais dados pessoais – ajuste conforme seu schema
-          // telefone: null,
-          // cpf: null,
-          // endereco: null,
-          // fotoUrl: null,
-          // qualquer outro campo pessoal
-        },
-      });
+      await tx.ciente_cookies.deleteMany({ where: { userId: id } }); 
+      await tx.usuario.delete({ where: { id } }); 
     });
 
     return reply.code(200).send('Usuário anonimizado com sucesso.');
   } catch (err: any) {
-    // como não estamos mais dando delete em usuario,
-    // o P2003 praticamente some daqui.
     if (err?.code === 'P2003') {
       return reply.status(409).send({
         message:
@@ -328,3 +314,4 @@ export const deletarUsuarios = async (
     return reply.status(500).send({ message: 'Erro ao processar exclusão de usuário.' });
   }
 };
+

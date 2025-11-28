@@ -245,7 +245,7 @@ export const TelegramService = {
     return sendToMany(html, dests);
   },
 
- async sendAgendamentoCreatedNotification(p: {
+  async sendAgendamentoCreatedNotification(p: {
     agendamentoId: number;
     itemNome: string;
     quantidade: number;
@@ -262,12 +262,15 @@ export const TelegramService = {
       dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo',
     }).format(p.executarEm);
 
+    const origemNome = await getEstoqueNome(p.estoqueOrigemId);
+    const destinoNome = await getEstoqueNome(p.estoqueDestinoId);
+
     const html =
       `🗓️ <b>Agendamento criado</b>\n` +
       `<b>ID:</b> ${p.agendamentoId}\n` +
       `<b>Item:</b> ${escHtml(p.itemNome)}\n` +
       `<b>Quantidade:</b> ${p.quantidade}\n` +
-      `<b>De:</b> #${p.estoqueOrigemId} → <b>Para:</b> #${p.estoqueDestinoId}\n` +
+      `<b>De:</b> ${escHtml(origemNome)} → <b>Para:</b> ${escHtml(destinoNome)}\n` +
       `<b>Executar em:</b> ${escHtml(executarEmFmt)}\n` +
       `<b>Por:</b> ${escHtml(p.usuario)}`;
 
@@ -291,12 +294,15 @@ export const TelegramService = {
       dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo',
     }).format(p.executarEm);
 
+    const origemNome = await getEstoqueNome(p.estoqueOrigemId);
+    const destinoNome = await getEstoqueNome(p.estoqueDestinoId);
+
     const html =
       `❌ <b>Agendamento cancelado</b>\n` +
       `<b>ID:</b> ${p.agendamentoId}\n` +
       `<b>Item:</b> ${escHtml(p.itemNome)}\n` +
       `<b>Quantidade:</b> ${p.quantidade}\n` +
-      `<b>De:</b> #${p.estoqueOrigemId} → <b>Para:</b> #${p.estoqueDestinoId}\n` +
+      `<b>De:</b> ${escHtml(origemNome)} → <b>Para:</b> ${escHtml(destinoNome)}\n` +
       `<b>Executaria em:</b> ${escHtml(executarEmFmt)}\n` +
       `<b>Por:</b> ${escHtml(p.usuario)}`;
 
@@ -320,6 +326,9 @@ export const TelegramService = {
       dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo',
     }).format(p.quando);
 
+    const origemNome = await getEstoqueNome(p.estoqueOrigemId);
+    const destinoNome = await getEstoqueNome(p.estoqueDestinoId);
+
     const html =
       `✅ <b>Agendamento executado</b>\n` +
       `<b>Agendamento:</b> ${p.agendamentoId}\n` +
@@ -327,7 +336,7 @@ export const TelegramService = {
       `<b>Quando:</b> ${escHtml(quandoFmt)}\n` +
       `<b>Item:</b> ${escHtml(p.itemNome)}\n` +
       `<b>Quantidade:</b> ${p.quantidade}\n` +
-      `<b>De:</b> #${p.estoqueOrigemId} → <b>Para:</b> #${p.estoqueDestinoId}`;
+      `<b>De:</b> ${escHtml(origemNome)} → <b>Para:</b> ${escHtml(destinoNome)}`;
 
     return sendToMany(html, dests);
   },
@@ -378,13 +387,16 @@ export const TelegramService = {
 
     const motivo = p.motivo ? escHtml(p.motivo) : 'Auto-reposição entre estoques';
 
+    const origemNome = await getEstoqueNome(p.estoqueOrigemId);
+    const destinoNome = await getEstoqueNome(p.estoqueDestinoId);
+
     const html =
       `🤖 <b>Auto-reposição programada</b>\n` +
       `<b>Motivo:</b> ${motivo}\n` +
       `<b>Item:</b> ${escHtml(p.itemNome)} (ID ${p.itemId})\n` +
       `<b>Quantidade a transferir:</b> ${p.quantidadeTransferir}\n` +
-      `<b>De:</b> #${p.estoqueOrigemId}  ( ${p.qtdOrigAntes} → ${p.qtdOrigDepois} )\n` +
-      `<b>Para:</b> #${p.estoqueDestinoId} ( ${p.qtdDestAntes} → ${p.qtdDestDepois} )\n` +
+      `<b>De:</b> ${escHtml(origemNome)}  ( ${p.qtdOrigAntes} → ${p.qtdOrigDepois} )\n` +
+      `<b>Para:</b> ${escHtml(destinoNome)} ( ${p.qtdDestAntes} → ${p.qtdDestDepois} )\n` +
       `<b>Mínimo destino:</b> ${p.minimoDestino}` +
       (p.faltando > 0
         ? `\n<b>Ainda faltando:</b> ${p.faltando} para atingir o alvo.`
@@ -400,10 +412,19 @@ export const TelegramService = {
     solicitacaoId: number;
     quando: Date;
   }): Promise<TelegramResult> {
-    if (!bot) return 'DISABLED';
+    if (!bot) {
+      console.warn('[telegram] sendAccessRequestNotification: bot NÃO iniciado');
+      return 'DISABLED';
+    }
 
     const s = params;
     const dests = await getDestinatariosPorEstoque(s.estoqueId);
+
+    console.log('[telegram] access request notify dests:', {
+      estoqueId: s.estoqueId,
+      dests,
+    });
+
     if (!dests.length) return 'NO_DESTS';
 
     const quandoFmt = new Intl.DateTimeFormat('pt-BR', {
@@ -417,7 +438,11 @@ export const TelegramService = {
       `<b>ID:</b> ${s.solicitacaoId}\n` +
       `<b>Quando:</b> ${escHtml(quandoFmt)}`;
 
-    return sendToMany(html, dests);
+    const result = await sendToMany(html, dests);
+
+    console.log('[telegram] sendAccessRequestNotification result =', result);
+
+    return result;
   },
 
   async sendTestForEstoque(estoqueId: number, opts?: { chatId?: string; text?: string }) {
@@ -457,11 +482,13 @@ export const TelegramService = {
     if (!bot) return 'DISABLED';
     const dests = await getDestinatariosPorEstoque(p.estoqueId);
     if (!dests.length) return 'NO_DESTS';
+
+    const estoqueNome = await getEstoqueNome(p.estoqueId);
     const falta = Math.max(0, p.minimo - p.quantidade);
 
     const html =
       `⚠️ <b>Abaixo do mínimo</b>\n` +
-      `<b>Estoque:</b> #${p.estoqueId}\n` +
+      `<b>Estoque:</b> ${escHtml(estoqueNome)}\n` +
       `<b>Item:</b> ${escHtml(p.itemNome)} (ID ${p.itemId})\n` +
       `<b>Qtd:</b> ${p.quantidade}  |  <b>Mín:</b> ${p.minimo}` +
       (falta > 0 ? `\n<b>Faltando:</b> ${falta}` : '');
@@ -474,9 +501,11 @@ export const TelegramService = {
     const dests = await getDestinatariosPorEstoque(p.estoqueId);
     if (!dests.length) return 'NO_DESTS';
 
+    const estoqueNome = await getEstoqueNome(p.estoqueId);
+
     const html =
       `🛑 <b>Ruptura de estoque</b>\n` +
-      `<b>Estoque:</b> #${p.estoqueId}\n` +
+      `<b>Estoque:</b> ${escHtml(estoqueNome)}\n` + 
       `<b>Item:</b> ${escHtml(p.itemNome)} (ID ${p.itemId})\n` +
       `<b>Qtd:</b> ${p.quantidade}  |  <b>Mín:</b> ${p.minimo}`;
 
@@ -488,9 +517,11 @@ export const TelegramService = {
     const dests = await getDestinatariosPorEstoque(p.estoqueId);
     if (!dests.length) return 'NO_DESTS';
 
+    const estoqueNome = await getEstoqueNome(p.estoqueId);
+
     const html =
       `✅ <b>Estoque normalizado</b>\n` +
-      `<b>Estoque:</b> #${p.estoqueId}\n` +
+      `<b>Estoque:</b> ${escHtml(estoqueNome)}\n` +
       `<b>Item:</b> ${escHtml(p.itemNome)} (ID ${p.itemId})\n` +
       `<b>Qtd:</b> ${p.quantidade}  |  <b>Mín:</b> ${p.minimo}`;
 
