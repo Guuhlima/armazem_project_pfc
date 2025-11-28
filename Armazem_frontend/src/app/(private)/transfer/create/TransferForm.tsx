@@ -22,6 +22,7 @@ interface Agendamento {
   quantidade: number;
   executarEm: string;
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELED" | "FAILED";
+  usuarioNome: string;
 }
 
 function classNames(...c: (string | false | null | undefined)[]) {
@@ -45,25 +46,25 @@ type TelegramResult = "SENT" | "NO_DESTS" | "DISABLED" | "ERROR" | "SKIPPED";
 
 type AlertEvent =
   | {
-      kind: "OPEN";
-      tipo: "ABAIXO_MINIMO" | "RUPTURA";
-      quantidade: number;
-      minimo: number;
-      telegram?: TelegramResult;
-    }
+    kind: "OPEN";
+    tipo: "ABAIXO_MINIMO" | "RUPTURA";
+    quantidade: number;
+    minimo: number;
+    telegram?: TelegramResult;
+  }
   | {
-      kind: "THROTTLED";
-      tipo: "ABAIXO_MINIMO" | "RUPTURA";
-      quantidade: number;
-      minimo: number;
-      telegram?: TelegramResult;
-    }
+    kind: "THROTTLED";
+    tipo: "ABAIXO_MINIMO" | "RUPTURA";
+    quantidade: number;
+    minimo: number;
+    telegram?: TelegramResult;
+  }
   | {
-      kind: "RESOLVED";
-      quantidade: number;
-      minimo: number;
-      telegram?: TelegramResult;
-    }
+    kind: "RESOLVED";
+    quantidade: number;
+    minimo: number;
+    telegram?: TelegramResult;
+  }
   | { kind: "NONE" };
 
 export default function TransferForm() {
@@ -156,22 +157,19 @@ export default function TransferForm() {
     if (a.kind === "OPEN") {
       if ((a as any).tipo === "RUPTURA") {
         toast(
-          `🛑 Ruptura • ${where} • Qtd ${(a as any).quantidade} / Mín ${
-            (a as any).minimo
+          `🛑 Ruptura • ${where} • Qtd ${(a as any).quantidade} / Mín ${(a as any).minimo
           }${suffix}`,
           true
         );
       } else {
         toast(
-          `⚠️ Abaixo do mínimo • ${where} • Qtd ${
-            (a as any).quantidade
+          `⚠️ Abaixo do mínimo • ${where} • Qtd ${(a as any).quantidade
           } / Mín ${(a as any).minimo}${suffix}`
         );
       }
     } else if (a.kind === "RESOLVED") {
       toast(
-        `✅ Normalizado • ${where} • Qtd ${(a as any).quantidade} / Mín ${
-          (a as any).minimo
+        `✅ Normalizado • ${where} • Qtd ${(a as any).quantidade} / Mín ${(a as any).minimo
         }${suffix}`
       );
     }
@@ -263,12 +261,12 @@ export default function TransferForm() {
             tg === "SENT"
               ? "📤 Telegram (transferência): enviado"
               : tg === "NO_DESTS"
-              ? "📤 Telegram (transferência): sem destinatários"
-              : tg === "DISABLED"
-              ? "📤 Telegram (transferência): desabilitado"
-              : tg === "ERROR"
-              ? "📤 Telegram (transferência): erro ao enviar"
-              : `📤 Telegram (transferência): ${tg}`;
+                ? "📤 Telegram (transferência): sem destinatários"
+                : tg === "DISABLED"
+                  ? "📤 Telegram (transferência): desabilitado"
+                  : tg === "ERROR"
+                    ? "📤 Telegram (transferência): erro ao enviar"
+                    : `📤 Telegram (transferência): ${tg}`;
           toast(msg, tg === "ERROR");
         }
       }
@@ -483,8 +481,8 @@ export default function TransferForm() {
             {isSubmitting
               ? "Processando..."
               : modoAgendar
-              ? "Agendar transferência"
-              : "Transferir agora"}
+                ? "Agendar transferência"
+                : "Transferir agora"}
           </button>
         </div>
       </form>
@@ -559,6 +557,10 @@ export default function TransferForm() {
                         Item:
                       </span>{" "}
                       {ag.itemId}
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Criado por:</span>{" "}
+                      {ag.usuarioNome}
                     </div>
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">

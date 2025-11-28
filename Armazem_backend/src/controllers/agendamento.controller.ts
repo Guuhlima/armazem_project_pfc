@@ -126,8 +126,31 @@ export async function listAgendamentos(_req: FastifyRequest, reply: FastifyReply
   try {
     const list = await prisma.transferenciaAgendada.findMany({
       orderBy: { executarEm: 'asc' },
+      include: {
+        item: { select: { nome: true } },
+        origem: { select: { nome: true } },
+        destino: { select: { nome: true } },
+        usuario: { select: { nome: true } },
+      },
     });
-    return reply.send(list);
+
+    const formatted = list.map((ag) => ({
+      id: ag.id,
+      itemId: ag.itemId,
+      estoqueOrigemId: ag.estoqueOrigemId,
+      estoqueDestinoId: ag.estoqueDestinoId,
+      quantidade: ag.quantidade,
+      executarEm: ag.executarEm,
+      status: ag.status,
+      erroUltimaTentativa: ag.erroUltimaTentativa,
+      item: ag.item ? { nome: ag.item.nome } : undefined,
+      estoqueOrigem: ag.origem ? { nome: ag.origem.nome } : undefined,
+      estoqueDestino: ag.destino ? { nome: ag.destino.nome } : undefined,
+
+      usuarioNome: ag.usuario?.nome ?? `user#${ag.usuarioId}`,
+    }));
+
+    return reply.send(formatted);
   } catch (e) {
     return reply.status(500).send({ error: 'Erro ao listar agendamentos' });
   }
