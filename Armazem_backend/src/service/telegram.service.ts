@@ -24,6 +24,16 @@ function chunk(text: string, max = 4096) {
   return out;
 }
 
+async function getEstoqueNome(estoqueId: number): Promise<string> {
+  const row = await prisma.estoque.findUnique({
+    where: { id: estoqueId },
+    select: { nome: true },
+  });
+
+  const base = row?.nome?.trim() || `Estoque #${estoqueId}`;
+  return base;
+}
+
 async function getDestinatariosPorEstoque(estoqueId: number): Promise<string[]> {
   const rows = await prisma.estoqueTelegramNotify.findMany({
     where: { estoqueId },
@@ -202,6 +212,7 @@ export const TelegramService = {
     if (!bot) return 'DISABLED';
 
     const t = params;
+
     const dests = Array.from(new Set([
       ...(await getDestinatariosPorEstoque(t.estoqueOrigemId)),
       ...(await getDestinatariosPorEstoque(t.estoqueDestinoId)),
@@ -214,14 +225,19 @@ export const TelegramService = {
     if (!dests.length) return 'NO_DESTS';
 
     const quandoFmt = new Intl.DateTimeFormat('pt-BR', {
-      dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo',
+      dateStyle: 'short',
+      timeStyle: 'short',
+      timeZone: 'America/Sao_Paulo',
     }).format(t.quando);
+
+    const origemNome = await getEstoqueNome(t.estoqueOrigemId);
+    const destinoNome = await getEstoqueNome(t.estoqueDestinoId);
 
     const html =
       `📦 <b>Nova transferência de equipamento</b>\n` +
       `<b>Item:</b> ${escHtml(t.itemNome)}\n` +
       `<b>Quantidade:</b> ${t.quantidade}\n` +
-      `<b>De:</b> #${t.estoqueOrigemId} → <b>Para:</b> #${t.estoqueDestinoId}\n` +
+      `<b>De:</b> ${escHtml(origemNome)} → <b>Para:</b> ${escHtml(destinoNome)}\n` +
       `<b>Por:</b> ${escHtml(t.usuario)}\n` +
       `<b>ID:</b> ${t.transferenciaId}\n` +
       `<b>Quando:</b> ${escHtml(quandoFmt)}`;
