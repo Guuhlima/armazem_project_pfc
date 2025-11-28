@@ -204,7 +204,7 @@ export default function Login() {
               </div>
 
               <p className="text-xs text-zinc-400 text-center">
-                © {new Date().getFullYear()} Gustavo Inc. Todos os direitos reservados.
+                © {new Date().getFullYear()} Armazem G3. Todos os direitos reservados.
               </p>
 
             </motion.div>

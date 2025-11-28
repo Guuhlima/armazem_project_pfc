@@ -66,8 +66,11 @@ async function bootstrap() {
     cookie: { cookieName: "accessToken", signed: false },
   });
 
-  if (process.env.REDIS_URL) {
+  if (process.env.REDIS_URL && process.env.REDIS_URL !== "") {
+    app.log.info("Conectando ao Redis...");
     await app.register(redis, { url: process.env.REDIS_URL });
+  } else {
+    app.log.warn("REDIS_URL não definida — Redis desabilitado.");
   }
 
   await app.register(rbacPlugin);
