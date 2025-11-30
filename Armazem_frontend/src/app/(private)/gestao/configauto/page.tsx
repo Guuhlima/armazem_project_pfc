@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
-import Footer from "@/app/(private)/components/Footer";
+import Footer from "@/components/Footer";
 
 type Estoque = { id: number; nome: string };
 type Equipamento = { id: number; nome: string };

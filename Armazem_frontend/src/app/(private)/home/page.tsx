@@ -1,5 +1,5 @@
 'use client';
-import Footer from "@/app/(private)/components/Footer";
+import Footer from "@/components/Footer";
 
 import dynamic from 'next/dynamic';
 

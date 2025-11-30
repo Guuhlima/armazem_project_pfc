@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Sidebar from '@/app/(private)/components/Sidebar';
 import TableUsuario from './components/TableUsuarios';
 import { Card, CardContent } from '@/components/ui/card';
-import Footer from '@/app/(private)/components/Footer';
+import Footer from '@/components/Footer';
 
 const UsuariosPage = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

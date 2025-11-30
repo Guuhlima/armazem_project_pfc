@@ -336,38 +336,6 @@ export default function Footer() {
 
                     <div>
                         <h2 className="text-sm font-semibold tracking-wide text-zinc-900 dark:text-zinc-50 uppercase mb-3">
-                            Links Rápidos
-                        </h2>
-                        <nav className="flex flex-col gap-2 text-sm">
-                            <Link
-                                href="/"
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                                Início
-                            </Link>
-                            <Link
-                                href="/home"
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                                Dashboard
-                            </Link>
-                            <Link
-                                href="/estoque/acess"
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                                Meu Armazém
-                            </Link>
-                            <Link
-                                href="/equipamento/create"
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                                Novo Equipamento
-                            </Link>
-                        </nav>
-                    </div>
-
-                    <div>
-                        <h2 className="text-sm font-semibold tracking-wide text-zinc-900 dark:text-zinc-50 uppercase mb-3">
                             Suporte
                         </h2>
                         <nav className="flex flex-col gap-2 text-sm">
@@ -397,12 +365,6 @@ export default function Footer() {
                             >
                                 Contato
                             </a>
-                            <Link
-                                href="/faq"
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                                FAQ
-                            </Link>
                         </nav>
                     </div>
 

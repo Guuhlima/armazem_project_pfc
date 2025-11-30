@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { useIsClient } from '@/hooks/useIsClient';
 import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
-import Footer from "@/app/(private)/components/Footer";
+import Footer from "@/components/Footer";
 
 type View =
   | "inicio"

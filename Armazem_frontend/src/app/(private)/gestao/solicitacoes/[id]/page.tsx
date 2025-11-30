@@ -9,7 +9,7 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import Footer from '@/app/(private)/components/Footer';
+import Footer from '@/components/Footer';
 
 export default function AccessRequestPage() {
   const { id } = useParams<{ id: string }>();
