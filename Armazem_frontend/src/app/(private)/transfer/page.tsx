@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Head from 'next/head';
 import TransferForm from "./create/TransferForm";
 import CreateEstoqueForm from "./create-estoque/CreateEstoqueForm";
 import ListEstoqueForm from "./list-estoque/ListarEstoque";
@@ -160,182 +161,188 @@ const TransferDashboardPage = () => {
   const blockRestricted = isRestricted && !canManageStock;
 
   return (
-    <div className="min-h-screen relative overflow-x-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors flex flex-col">
+    <>
+      <Head>
+        <title>{viewTitles[view]} | Armazem G3</title>
+        <link rel="icon" href="pub" />
+      </Head>
 
-      {/* Fundo em grid, sempre atrás de tudo */}
-      <div
-        className="fixed inset-0 -z-10 animate-neon-grid"
-        style={{
-          backgroundColor: 'transparent',
-          backgroundImage: `
-            linear-gradient(rgba(200, 200, 200, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(200, 200, 200, 0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '30px 30px',
-        }}
-      >
+      <div className="min-h-screen relative overflow-x-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors flex flex-col">
+
         <div
-          className="absolute inset-0 hidden dark:block"
+          className="fixed inset-0 -z-10 animate-neon-grid"
           style={{
+            backgroundColor: 'transparent',
             backgroundImage: `
-              linear-gradient(rgba(29, 78, 216, 0.2) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(29, 78, 216, 0.2) 1px, transparent 1px)
+              linear-gradient(rgba(200, 200, 200, 0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(200, 200, 200, 0.1) 1px, transparent 1px)
             `,
             backgroundSize: '30px 30px',
-            boxShadow: 'inset 0 0 100px 50px rgba(29, 78, 216, 0.15)',
           }}
+        >
+          <div
+            className="absolute inset-0 hidden dark:block"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(29, 78, 216, 0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(29, 78, 216, 0.2) 1px, transparent 1px)
+              `,
+              backgroundSize: '30px 30px',
+              boxShadow: 'inset 0 0 100px 50px rgba(29, 78, 216, 0.15)',
+            }}
+          />
+        </div>
+
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onLogout={handleLogout}
         />
-      </div>
 
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        onLogout={handleLogout}
-      />
-
-      <main
-        className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${sidebarCollapsed ? "ml-16" : "ml-64"} flex-1`}
-        role="main"
-      >
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <nav className="flex items-center text-sm text-muted-foreground mb-1">
-                {view !== "inicio" ? (
-                  <>
-                    <button
-                      onClick={() => safeSetView("inicio")}
-                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Painel
-                    </button>
-                    <ChevronRight className="w-4 h-4 mx-1 text-muted-foreground/50" />
-                    <span className="font-medium text-primary">{viewTitles[view]}</span>
-                  </>
-                ) : (
-                  <span className="font-medium text-primary flex items-center gap-2">
-                    <LayoutGrid className="w-4 h-4" /> Painel de Transferências
-                  </span>
+        <main
+          className={`relative z-10 transition-all duration-300 p-4 md:p-6 bg-transparent ${sidebarCollapsed ? "ml-16" : "ml-64"} flex-1`}
+          role="main"
+        >
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <nav className="flex items-center text-sm text-muted-foreground mb-1">
+                  {view !== "inicio" ? (
+                    <>
+                      <button
+                        onClick={() => safeSetView("inicio")}
+                        className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        Painel
+                      </button>
+                      <ChevronRight className="w-4 h-4 mx-1 text-muted-foreground/50" />
+                      <span className="font-medium text-primary">{viewTitles[view]}</span>
+                    </>
+                  ) : (
+                    <span className="font-medium text-primary flex items-center gap-2">
+                      <LayoutGrid className="w-4 h-4" /> Painel de Transferências
+                    </span>
+                  )}
+                </nav>
+                <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+                  {viewTitles[view]}
+                </h1>
+                {view === "inicio" && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Selecione uma ação para gerenciar seus estoques e movimentações.
+                  </p>
                 )}
-              </nav>
-              <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight text-foreground">
-                {viewTitles[view]}
-              </h1>
+              </div>
+              <div className="w-full md:w-auto">
+                <Segmented view={view} setView={safeSetView} canManageStock={canManageStock} />
+              </div>
+            </div>
+
+            <Separator className="bg-border/50" />
+
+            <AnimatePresence mode="wait">
               {view === "inicio" && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Selecione uma ação para gerenciar seus estoques e movimentações.
-                </p>
+                <motion.section
+                  key="inicio"
+                  initial={enter} animate={center} exit={exit}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+                >
+                  {canManageStock && (
+                    <>
+                      <ActionCard
+                        title="Criar estoque"
+                        subtitle="Novo"
+                        icon={<PlusCircle className="w-6 h-6" />}
+                        onClick={() => safeSetView("criarEstoque")}
+                      />
+                      <ActionCard
+                        title="Estoques existentes"
+                        subtitle="Consultar"
+                        icon={<Boxes className="w-6 h-6" />}
+                        onClick={() => safeSetView("listarEstoques")}
+                      />
+                    </>
+                  )}
+
+                  <ActionCard
+                    title="Nova transferência"
+                    subtitle="Operação"
+                    icon={<Repeat className="w-6 h-6" />}
+                    onClick={() => safeSetView("novaTransferencia")}
+                  />
+                  <ActionCard
+                    title="Novo recebimento"
+                    subtitle="Entrada"
+                    icon={<PlusCircle className="w-6 h-6" />}
+                    onClick={() => safeSetView("novoRecebimento")}
+                  />
+                  <ActionCard
+                    title="Nova saída"
+                    subtitle="Operação"
+                    icon={<PackageMinus className="w-6 h-6" />}
+                    onClick={() => safeSetView("novaSaida")}
+                  />
+                  <ActionCard
+                    title="Contagem cíclica"
+                    subtitle="Inventário rotativo"
+                    icon={<Boxes className="w-6 h-6" />}
+                    onClick={() => safeSetView("contagemCiclica")}
+                  />
+                </motion.section>
               )}
-            </div>
-            <div className="w-full md:w-auto">
-              <Segmented view={view} setView={safeSetView} canManageStock={canManageStock} />
-            </div>
-          </div>
 
-          <Separator className="bg-border/50" />
+              {view !== "inicio" && (
+                <motion.section
+                  key={view}
+                  initial={enter} animate={center} exit={exit}
+                >
+                  <Card className="w-full bg-card/90 dark:bg-card/85 backdrop-blur-lg border border-border dark:border-blue-800/50 shadow-xl rounded-xl overflow-hidden">
+                    <CardHeader className="p-6 border-b border-border dark:border-blue-800/40">
+                      <CardTitle className="text-xl font-semibold text-foreground">
+                        {viewTitles[view]}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 md:p-6">
+                      {blockRestricted ? (
+                        <p className="text-sm text-red-500">Acesso negado.</p>
+                      ) : (
+                        <>
+                          {view === "criarEstoque" && <CreateEstoqueForm />}
+                          {view === "listarEstoques" && <ListEstoqueForm />}
+                        </>
+                      )}
 
-          <AnimatePresence mode="wait">
-            {view === "inicio" && (
-              <motion.section
-                key="inicio"
-                initial={enter} animate={center} exit={exit}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                {canManageStock && (
-                  <>
-                    <ActionCard
-                      title="Criar estoque"
-                      subtitle="Novo"
-                      icon={<PlusCircle className="w-6 h-6" />}
-                      onClick={() => safeSetView("criarEstoque")}
-                    />
-                    <ActionCard
-                      title="Estoques existentes"
-                      subtitle="Consultar"
-                      icon={<Boxes className="w-6 h-6" />}
-                      onClick={() => safeSetView("listarEstoques")}
-                    />
-                  </>
-                )}
-
-                <ActionCard
-                  title="Nova transferência"
-                  subtitle="Operação"
-                  icon={<Repeat className="w-6 h-6" />}
-                  onClick={() => safeSetView("novaTransferencia")}
-                />
-                <ActionCard
-                  title="Novo recebimento"
-                  subtitle="Entrada"
-                  icon={<PlusCircle className="w-6 h-6" />}
-                  onClick={() => safeSetView("novoRecebimento")}
-                />
-                <ActionCard
-                  title="Nova saída"
-                  subtitle="Operação"
-                  icon={<PackageMinus className="w-6 h-6" />}
-                  onClick={() => safeSetView("novaSaida")}
-                />
-                <ActionCard
-                  title="Contagem cíclica"
-                  subtitle="Inventário rotativo"
-                  icon={<Boxes className="w-6 h-6" />}
-                  onClick={() => safeSetView("contagemCiclica")}
-                />
-              </motion.section>
-            )}
+                      {view === "novaTransferencia" && <TransferForm />}
+                      {view === "novoRecebimento" && <RecebimentoForm />}
+                      {view === "novaSaida" && <SaidaForm />}
+                      {view === "contagemCiclica" && <ContagensPage />}
+                    </CardContent>
+                  </Card>
+                </motion.section>
+              )}
+            </AnimatePresence>
 
             {view !== "inicio" && (
-              <motion.section
-                key={view}
-                initial={enter} animate={center} exit={exit}
-              >
-                <Card className="w-full bg-card/90 dark:bg-card/85 backdrop-blur-lg border border-border dark:border-blue-800/50 shadow-xl rounded-xl overflow-hidden">
-                  <CardHeader className="p-6 border-b border-border dark:border-blue-800/40">
-                    <CardTitle className="text-xl font-semibold text-foreground">
-                      {viewTitles[view]}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 md:p-6">
-                    {blockRestricted ? (
-                      <p className="text-sm text-red-500">Acesso negado.</p>
-                    ) : (
-                      <>
-                        {view === "criarEstoque" && <CreateEstoqueForm />}
-                        {view === "listarEstoques" && <ListEstoqueForm />}
-                      </>
-                    )}
-
-                    {view === "novaTransferencia" && <TransferForm />}
-                    {view === "novoRecebimento" && <RecebimentoForm />}
-                    {view === "novaSaida" && <SaidaForm />}
-                    {view === "contagemCiclica" && <ContagensPage />}
-                  </CardContent>
-                </Card>
-              </motion.section>
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="ghost"
+                  className="text-primary hover:text-primary/90"
+                  onClick={() => safeSetView("inicio")}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Voltar ao menu principal
+                </Button>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
+        </main>
 
-          {view !== "inicio" && (
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="ghost"
-                className="text-primary hover:text-primary/90"
-                onClick={() => safeSetView("inicio")}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Voltar ao menu principal
-              </Button>
-            </div>
-          )}
+        <div className="relative z-10">
+          <Footer />
         </div>
-      </main>
-
-      <div className="relative z-10">
-        <Footer />
       </div>
-    </div>
+    </>
   );
 };
 

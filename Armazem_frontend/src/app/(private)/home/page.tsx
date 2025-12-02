@@ -1,5 +1,6 @@
 'use client';
 import Footer from "@/components/Footer";
+import Head from 'next/head';
 
 import dynamic from 'next/dynamic';
 
@@ -9,7 +10,10 @@ export default function HomePage() {
   return (
     <>
       <Home />
-      {/* <Footer /> */}
+      <Head>
+        <title>Armazem G3</title>
+        <link rel="icon" href="pub" />
+      </Head>
     </>
   );
 

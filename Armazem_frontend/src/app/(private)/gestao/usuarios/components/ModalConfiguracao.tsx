@@ -304,7 +304,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
 
         <Separator className="my-2" />
 
-        {/* Permissões por estoque */}
         <div className="space-y-3">
           <div className="font-medium">Permissões no estoque</div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">

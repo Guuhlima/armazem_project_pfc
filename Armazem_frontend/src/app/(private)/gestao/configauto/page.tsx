@@ -19,6 +19,7 @@ import {
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import Footer from "@/components/Footer";
+import Head from 'next/head';
 
 type Estoque = { id: number; nome: string };
 type Equipamento = { id: number; nome: string };
@@ -264,6 +265,10 @@ export default function ReposicaoAutoPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
+      <Head>
+        <title>Armazem G3</title>
+        <link rel="icon" href="pub" />
+      </Head>
       <div
         className="fixed inset-0 z-0 animate-neon-grid"
         style={{

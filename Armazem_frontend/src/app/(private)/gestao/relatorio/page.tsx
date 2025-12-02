@@ -19,6 +19,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
 } from "recharts";
 import Sidebar from "@/app/(private)/components/Sidebar";
+import Head from 'next/head';
 
 type Estoque = { id: number; nome: string };
 
@@ -252,6 +253,10 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen flex">
+      <Head>
+        <title>Armazem G3</title>
+        <link rel="icon" href="pub" />
+      </Head>
       <aside className={`print:hidden hidden md:block border-r border-border bg-background h-screen sticky top-0 ${collapsed ? "w-16" : "w-64"} transition-[width] duration-200`}>
         <Sidebar
           collapsed={collapsed}

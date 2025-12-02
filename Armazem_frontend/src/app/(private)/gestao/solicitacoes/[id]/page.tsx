@@ -10,6 +10,7 @@ import withReactContent from 'sweetalert2-react-content';
 import { CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Footer from '@/components/Footer';
+import Head from 'next/head';
 
 export default function AccessRequestPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,9 +103,11 @@ export default function AccessRequestPage() {
   };
 
   return (
-    // Container principal
     <div className="min-h-screen relative overflow-hidden bg-zinc-100 dark:bg-black text-zinc-900 dark:text-zinc-100 transition-colors">
-
+      <Head>
+        <title>Armazem G3</title>
+        <link rel="icon" href="pub" />
+      </Head>
       <div
         className="fixed inset-0 z-0 animate-starfield opacity-40 dark:opacity-70 bg-zinc-100 dark:bg-black"
         style={{

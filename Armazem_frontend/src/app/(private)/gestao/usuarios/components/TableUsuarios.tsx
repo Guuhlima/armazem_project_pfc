@@ -90,15 +90,20 @@ const TableUsuario = () => {
 
   const canDeleteUser = useMemo(() => {
     return (target: Usuario) => {
-      if (isSuper) return true;
+      const alvoEhSuper = (target.permissoes ?? []).includes('SUPER-ADMIN');
+      const isSelf = user && target.id === user.id;
+
+      if (isSuper) {
+        if (isSelf && alvoEhSuper) return false;
+        return true;
+      }
 
       if (isAdmin) {
-        const alvoEhSuper = (target.permissoes ?? []).includes('SUPER-ADMIN');
         return !alvoEhSuper;
       }
 
       if (isRestrictedUser && user) {
-        return target.id === user.id;
+        return isSelf && !alvoEhSuper;
       }
 
       return false;
@@ -191,7 +196,7 @@ const TableUsuario = () => {
             <tr>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">Nome</th>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">
-                {isSuper ? 'Email' : 'Email (parcial)'}
+                Email (parcial)
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground">Permissões</th>
               <th className="px-4 py-3 text-sm font-semibold text-muted-foreground text-right">Ações</th>
@@ -227,7 +232,7 @@ const TableUsuario = () => {
                     <td className="px-4 py-3">{usuario.nome ?? '—'}</td>
                     <td
                       className="px-4 py-3"
-                      title={isSuper ? 'E-mail completo' : 'E-mail parcial (anonimizado)'}
+                      title="E-mail parcial (anonimizado)"
                     >
                       {displayEmail(usuario.email)}
                     </td>

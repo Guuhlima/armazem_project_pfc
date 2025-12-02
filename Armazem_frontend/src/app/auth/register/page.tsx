@@ -10,6 +10,7 @@ import { User, Mail, Lock, Package } from 'lucide-react';
 import api from '@/services/api';
 import Swal from 'sweetalert2';
 import Footer from '@/components/Footer';
+import Head from 'next/head';
 
 export default function Register() {
   const router = useRouter();
@@ -220,7 +221,10 @@ export default function Register() {
   return (
     <div className="dark">
       <main className="min-h-screen flex flex-col relative overflow-hidden bg-zinc-900 text-zinc-100">
-        {/* background */}
+      <Head>
+        <title> Armazem G3</title>
+        <link rel="icon" href="pub" />
+      </Head>
         <div
           className="absolute inset-0 z-0 animate-pan-grid"
           style={{
