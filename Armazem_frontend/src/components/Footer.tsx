@@ -340,12 +340,6 @@ export default function Footer() {
                         </h2>
                         <nav className="flex flex-col gap-2 text-sm">
                             <Link
-                                href="/central-ajuda"
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                                Central de Ajuda
-                            </Link>
-                            <Link
                                 href="/termos"
                                 onClick={openModal("termos")}
                                 className="text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"

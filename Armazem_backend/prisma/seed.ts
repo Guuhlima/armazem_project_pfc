@@ -76,8 +76,10 @@ async function main() {
       "equipment:read",
       "transfer:manage",
       "stock:read",
+      "count:start",
       "count:read",
       "count:input",
+      "count:cancel",
     ],
     "USER-EQUIPAMENTOS": [
       "equipment:read",

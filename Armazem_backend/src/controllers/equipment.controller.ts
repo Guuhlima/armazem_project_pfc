@@ -36,6 +36,27 @@ export async function cadastrarEquipamento(
   }
 }
 
+// Listar equipamentos e vincular do armazem diretamente
+export async function listarEquipamentos(req: FastifyRequest, reply: FastifyReply) {
+  try {
+    const itens = await prisma.equipamento.findMany({
+      orderBy: { nome: 'asc' },
+    });
+
+    const payload = itens.map(it => ({
+      id: it.id,
+      nome: it.nome ?? null,
+      data: it.data ?? null,
+      rastreioTipo: it.rastreioTipo,
+    }));
+
+    reply.send(payload);
+  } catch (error) {
+    console.error(error);
+    reply.status(500).send({ error: 'Erro ao buscar equipamentos' });
+  }
+}
+
 // Visualizar todos equipamentos (Refletido pelo warehouse)
 export async function visualizarEquipamentos(req: FastifyRequest, reply: FastifyReply) {
   try {
@@ -168,7 +189,6 @@ export async function deletarEquipamento(
 ) {
   const id = Number(req.params.id);
   try {
-    // 1) Verifica histórico (NÃO apagar)
     const [qMov, qTransf] = await Promise.all([
       prisma.movEstoque.count({ where: { itemId: id } }),
       prisma.transferencia.count({ where: { itemId: id } }),
@@ -181,7 +201,6 @@ export async function deletarEquipamento(
       });
     }
 
-    // 2) Apaga dependências permitidas e depois o item
     const deleted = await prisma.$transaction(async (tx) => {
       await tx.alertaEstoque.deleteMany({ where: { itemId: id } });
       await tx.contagemCiclicaTarefa.deleteMany({ where: { itemId: id } });

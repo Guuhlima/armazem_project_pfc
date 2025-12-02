@@ -5,7 +5,7 @@ import { RequireAuth } from '@/components/auth/RequireAuth';
 
 export default function TransferLayout({ children }: { children: ReactNode }) {
     return (
-        <RequireAuth permOrRole={['TRANSFER', 'ADMIN', 'SUPER-ADMIN']}>
+        <RequireAuth permOrRole={['TRANSFER', 'ADMIN', 'SUPER-ADMIN', 'USER-EQUIP-TRANSFER']}>
             {children}
         </RequireAuth>
     );

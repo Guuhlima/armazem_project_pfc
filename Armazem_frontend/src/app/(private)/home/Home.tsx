@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { FilterEquipamentos } from "../components/FilterEquipamentos";
 import { CountStatus, listTarefas } from "@/services/contagens";
 import { ContagemModal } from "./components/ContagemModal";
+import ManageWarehousesModal from "./components/ManageWarehouse";
 
 type BackendEquip = {
   id: number;
@@ -39,6 +40,7 @@ const Home = () => {
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [openReq, setOpenReq] = useState(false);
+  const [openManage, setOpenManage] = useState(false); // <<< NOVO
   const [filters, setFilters] = useState<Filters>({});
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -53,6 +55,9 @@ const Home = () => {
   const { logout, user, roles } = useAuth();
   const { loading, isLinked, names, refresh, warehouses } = useMyWarehouses();
 
+  const isSuperAdmin = useMemo(() => roles?.includes("SUPER-ADMIN"), [roles]); // <<< NOVO
+  const isAdmin = useMemo(() => roles?.includes("ADMIN"), [roles]);            // <<< NOVO
+
   const warehouseOptions = useMemo(
     () =>
       (warehouses || []).map((w) => ({
@@ -63,8 +68,7 @@ const Home = () => {
   );
 
   const isEquipamentosUser = useMemo(
-    () =>
-      roles?.includes("USER-EQUIPAMENTOS"),
+    () => roles?.includes("USER-EQUIPAMENTOS"),
     [roles]
   );
 
@@ -76,7 +80,7 @@ const Home = () => {
   const warehousesParam = useMemo(
     () => linkedWarehouseIds.join(","),
     [linkedWarehouseIds]
-  )
+  );
 
   function irParaContagemCiclica() {
     router.push("/transfer?view=contagemCiclica");
@@ -91,12 +95,9 @@ const Home = () => {
           return;
         }
 
-        const { data } = await api.get<BackendEquip[]>(
-          "/equipment/visualizar",
-          {
-            params: { warehouses: warehousesParam },
-          }
-        );
+        const { data } = await api.get<BackendEquip[]>("/equipment/visualizar", {
+          params: { warehouses: warehousesParam },
+        });
 
         const onlyLinked = (Array.isArray(data) ? data : []).filter(
           (item) =>
@@ -138,7 +139,7 @@ const Home = () => {
   const filteredEquipamentos = useMemo(() => {
     return equipamentos.filter((e) => {
       if (
-        filters.warehouseId !== '' &&
+        filters.warehouseId !== "" &&
         filters.warehouseId != null &&
         e.warehouseId !== Number(filters.warehouseId)
       ) {
@@ -169,7 +170,6 @@ const Home = () => {
     });
   }, [equipamentos, filters]);
 
-
   useEffect(() => {
     if (isEquipamentosUser) {
       setContagemCiclica(0);
@@ -183,8 +183,7 @@ const Home = () => {
         const tarefas = await listTarefas("PENDING" as CountStatus);
         if (cancelado) return;
 
-        setContagemCiclica(tarefas.length)
-
+        setContagemCiclica(tarefas.length);
       } catch (err) {
         console.error("Erro ao buscar contagens ciclicas", err);
       }
@@ -197,8 +196,8 @@ const Home = () => {
     return () => {
       cancelado = true;
       clearInterval(intervalId);
-    }
-  }, [isEquipamentosUser])
+    };
+  }, [isEquipamentosUser]);
 
   useEffect(() => {
     if (isEquipamentosUser) return;
@@ -213,7 +212,6 @@ const Home = () => {
     }
   }, [contagemCiclica, alertouContagem, isEquipamentosUser]);
 
-
   useEffect(() => {
     if (contagemCiclica > 0 && !alertouContagem) {
       setModalContagemOpen(true);
@@ -223,14 +221,14 @@ const Home = () => {
     if (contagemCiclica === 0 && alertouContagem) {
       setAlertouContagem(true);
     }
-  }, [contagemCiclica, alertouContagem])
+  }, [contagemCiclica, alertouContagem]);
 
   const handleSelect = (item: Equipamento) => setSelectedId(item.id);
 
-  const handleCardClick = () => {
-    if (isLinked) router.push("/estoque/acess");
-    else setOpenReq(true);
-  };
+  // const handleCardClick = () => {
+  //   if (isLinked) router.push("/estoque/acess");
+  //   else setOpenReq(true);
+  // };
 
   // EDIT
   const handleEdit = (item: Equipamento) => {
@@ -238,10 +236,7 @@ const Home = () => {
     setEditOpen(true);
   };
 
-  const handleEditField = (
-    field: keyof Equipamento,
-    value: string | number
-  ) => {
+  const handleEditField = (field: keyof Equipamento, value: string | number) => {
     if (!editData) return;
     setEditData({
       ...editData,
@@ -285,7 +280,7 @@ const Home = () => {
         );
         if (ok) {
           await api.patch(`/equipment/arquivar/${item.id}`);
-          setEquipamentos((prev) => prev.filter((e) => e.id !== item.id)); // some da lista
+          setEquipamentos((prev) => prev.filter((e) => e.id !== item.id));
         }
       } else {
         alert(e?.response?.data?.message ?? "Erro ao excluir");
@@ -325,8 +320,9 @@ const Home = () => {
         />
 
         <main
-          className={`transition-all duration-300 p-6 pt-4 space-y-8 ${collapsed ? "ml-16" : "ml-60"
-            }`}
+          className={`transition-all duration-300 p-6 pt-4 space-y-8 ${
+            collapsed ? "ml-16" : "ml-60"
+          }`}
         >
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -363,9 +359,7 @@ const Home = () => {
                 <PackageCheck className="w-5 h-5 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
-                  {filteredEquipamentos.length}
-                </div>
+                <div className="text-3xl font-bold">{filteredEquipamentos.length}</div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                   Equipamentos (após filtros)
                 </p>
@@ -390,9 +384,9 @@ const Home = () => {
             </Card>
 
             <Card
-              onClick={handleCardClick}
-              className={`bg-white/90 dark:bg-zinc-900/70 border border-blue-500/10 dark:border-blue-500/20 shadow-sm ${isLinked ? "hover:border-blue-500/30 cursor-pointer" : ""
-                }`}
+              className={`bg-white/90 dark:bg-zinc-900/70 border border-blue-500/10 dark:border-blue-500/20 shadow-sm ${
+                isLinked ? "hover:border-blue-500/30 cursor-pointer" : ""
+              }`}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
@@ -405,15 +399,22 @@ const Home = () => {
                   <div className="h-6 w-full bg-zinc-200 dark:bg-zinc-700 animate-pulse rounded mt-1" />
                 ) : isLinked ? (
                   <>
-                    <div
-                      className="text-xl font-semibold truncate"
-                      title={names}
-                    >
+                    <div className="text-xl font-semibold truncate" title={names}>
                       {names}
                     </div>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Clique para ver detalhes
-                    </p>
+                    {/* Botão para abrir o modal de vinculação a outro armazém */}
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenManage(true);
+                        }}
+                      >
+                        Ver mais detalhes
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -438,9 +439,7 @@ const Home = () => {
           <Separator className="bg-zinc-200 dark:bg-zinc-700/50" />
 
           <section className="relative z-10 space-y-4">
-            <h2 className="text-xl font-semibold tracking-tight">
-              Inventário Rápido
-            </h2>
+            <h2 className="text-xl font-semibold tracking-tight">Inventário Rápido</h2>
 
             <Card className="bg-white/90 dark:bg-zinc-900/70 border border-blue-500/10 dark:border-blue-500/20 shadow-sm">
               <CardContent className="p-4">
@@ -477,6 +476,15 @@ const Home = () => {
         onRequested={refresh}
       />
 
+      <ManageWarehousesModal
+        open={openManage}
+        onClose={() => setOpenManage(false)}
+        excludeIds={linkedWarehouseIds}
+        isSuperAdmin={!!isSuperAdmin}
+        isAdmin={!!isAdmin}
+        onAfterAction={refresh}
+      />
+
       {/* Modal simples de edição */}
       {editOpen && editData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -508,9 +516,7 @@ const Home = () => {
                   min={0}
                   className="mt-1 w-full h-9 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 text-sm"
                   value={editData.quantidade}
-                  onChange={(e) =>
-                    handleEditField("quantidade", e.target.value)
-                  }
+                  onChange={(e) => handleEditField("quantidade", e.target.value)}
                 />
               </div>
 
@@ -555,13 +561,14 @@ const Home = () => {
           </div>
         </div>
       )}
+
       <ContagemModal
         open={modalContagemOpen}
         quantidade={contagemCiclica}
         onClose={() => setModalContagemOpen(false)}
         onIrParaContagem={() => {
           setModalContagemOpen(false);
-          router.push("/transfer?view=contagemCiclica")
+          router.push("/transfer?view=contagemCiclica");
         }}
       />
     </div>

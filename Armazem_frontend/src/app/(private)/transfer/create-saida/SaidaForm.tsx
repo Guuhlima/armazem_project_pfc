@@ -26,7 +26,6 @@ export default function SaidaForm() {
   const [serialNumero, setSerialNumero] = useState('');
   const [loadingSerial, setLoadingSerial] = useState(false);
 
-  // NEW: permitir considerar lotes vencidos
   const [permitirVencidos, setPermitirVencidos] = useState(false);
 
   const MySwal = withReactContent(Swal);
@@ -39,7 +38,6 @@ export default function SaidaForm() {
     return d < hojeYmd();
   };
 
-  // Carrega estoques
   useEffect(() => {
     (async () => {
       if (!hasPermission(['ADMIN', 'SUPER-ADMIN', 'USER-EQUIP-TRANSFER'])) return;
@@ -50,7 +48,6 @@ export default function SaidaForm() {
     })();
   }, [hasPermission]);
 
-  // Carrega itens do estoque selecionado
   useEffect(() => {
     if (!estoqueId) {
       setItens([]);
@@ -78,10 +75,14 @@ export default function SaidaForm() {
     })();
   }, [estoqueId]);
 
-  // FEFO: buscar sugestões
   async function carregarSugestoes() {
     if (!itemId || !estoqueId) return setSugestoes([]);
     try {
+      console.log('[DEBUG FEFO] chamando /stock/sugerir-fefo com', {
+        itemId: Number(itemId),
+        estoqueId: Number(estoqueId),
+      });
+
       const res = await api.get('/stock/sugerir-fefo', {
         params: { itemId: Number(itemId), estoqueId: Number(estoqueId), take: 50 }
       });
@@ -93,7 +94,7 @@ export default function SaidaForm() {
         .map((l: any) => {
           const rawCodigo =
             l.codigo ?? l.code ?? l.loteCodigo ?? l.lote?.codigo ?? `L${l.lote_id ?? l.loteId ?? l.id ?? '—'}`;
-          const codigo = String(rawCodigo).replace(/^"+|"+$/g, ''); // remove aspas extras
+          const codigo = String(rawCodigo).replace(/^"+|"+$/g, '');
 
           return {
             lote_id: Number(l.lote_id ?? l.loteId ?? l.id ?? l.lote?.id ?? l.lote?.loteId ?? 0),
@@ -114,7 +115,6 @@ export default function SaidaForm() {
 
   useEffect(() => { carregarSugestoes(); }, [itemId, estoqueId]);
 
-  // Conjuntos (válidos vs considerados)
   const sugestoesValidas = useMemo(
     () => (sugestoes || []).filter(l => !isVencido(l.validade)),
     [sugestoes]
@@ -124,7 +124,6 @@ export default function SaidaForm() {
     [permitirVencidos, sugestoes, sugestoesValidas]
   );
 
-  // Totais
   const totalDisp = useMemo(
     () => (sugestoesConsideradas || []).reduce((s, x) => s + Number(x.saldo || 0), 0),
     [sugestoesConsideradas]
@@ -134,7 +133,6 @@ export default function SaidaForm() {
     [sugestoes]
   );
 
-  // Preview (distribuição FEFO sobre as consideradas)
   const preview = useMemo(() => {
     let restante = Number(quantidade || 0);
     return (sugestoesConsideradas || []).map(l => {
@@ -149,19 +147,16 @@ export default function SaidaForm() {
     itemId && estoqueId && quantidade && Number(quantidade) > 0 && Number(quantidade) <= totalDisp
   );
 
-  // Mapa de metadados
   const mapLote = useMemo(() => {
     const m = new Map<number, { codigo: string; validade: string | null }>();
     sugestoes.forEach(l => m.set(l.lote_id, { codigo: l.codigo, validade: l.validade }));
     return m;
   }, [sugestoes]);
 
-  // Submit FEFO
   async function onSubmitFEFO(e: React.FormEvent) {
     e.preventDefault();
     if (!podeEnviarFEFO) return;
 
-    // se vai usar vencidos, confirmar
     if (permitirVencidos) {
       const vaiUsarVencidos = preview.some(p => p.usar > 0 && isVencido(p.validade));
       if (vaiUsarVencidos) {
@@ -185,7 +180,7 @@ export default function SaidaForm() {
         quantidadeSolicitada: Number(quantidade),
         referencia: { tabela: 'pedido_saida', id: undefined as number | undefined }
       };
-      if (permitirVencidos) body.permitirVencidos = true; // opcional, se o back aceitar
+      if (permitirVencidos) body.permitirVencidos = true;
 
       const res = await api.post('/stock/picking-fefo', body);
 
@@ -206,7 +201,6 @@ export default function SaidaForm() {
     } finally { setLoading(false); }
   }
 
-  // Submit SERIAL
   async function onSubmitSerial(e: React.FormEvent) {
     e.preventDefault();
     setLoadingSerial(true);
@@ -227,7 +221,6 @@ export default function SaidaForm() {
     } finally { setLoadingSerial(false); }
   }
 
-  // UI
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
@@ -292,7 +285,6 @@ export default function SaidaForm() {
               )}
             </p>
 
-            {/* Toggle permitir vencidos (aparece se houver vencidos) */}
             {(sugestoes.some(s => isVencido(s.validade))) && (
               <label className="mt-2 inline-flex items-center gap-2 text-xs cursor-pointer select-none">
                 <input
@@ -315,7 +307,6 @@ export default function SaidaForm() {
                 <Button type="button" size="sm" variant="outline" onClick={carregarSugestoes}>Atualizar</Button>
               </div>
 
-              {/* Cabeçalho */}
               <div className="grid grid-cols-5 gap-2 text-xs font-mono">
                 <div className="font-semibold">Lote</div>
                 <div className="font-semibold">Validade</div>
@@ -323,7 +314,6 @@ export default function SaidaForm() {
                 <div className="font-semibold">Será usado?</div>
                 <div className="font-semibold">Status</div>
 
-                {/* Linhas: preview com válidos + (se habilitado) vencidos integrados */}
                 {preview.map((l) => {
                   const venc = l.validade ? new Date(l.validade).toLocaleDateString('pt-BR') : '—';
                   const vencido = isVencido(l.validade);
@@ -348,7 +338,6 @@ export default function SaidaForm() {
                   );
                 })}
 
-                {/* Se o toggle estiver OFF, mostrar vencidos “somente visual” */}
                 {!permitirVencidos && sugestoes
                   .filter(l => isVencido(l.validade))
                   .map((l) => {

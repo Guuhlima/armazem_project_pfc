@@ -5,6 +5,7 @@ import {
   visualizarEquipamentos,
   visualizarEquipamentosPorId,
   deletarEquipamento,
+  listarEquipamentos
 } from "../controllers/equipment.controller";
 import {
   EquipamentoBodySchema,
@@ -13,6 +14,11 @@ import {
 
 export async function equipamentosRoutes(app: FastifyInstance) {
   app.addHook("onRequest", app.authenticate);
+
+  app.get("/equipment/visualizarItem", {
+    preHandler: [app.rbac.requirePerm("equipment:read")],
+    handler: listarEquipamentos,
+  })
 
   app.get("/equipment/visualizar", {
     preHandler: [app.rbac.requirePerm("equipment:read")],

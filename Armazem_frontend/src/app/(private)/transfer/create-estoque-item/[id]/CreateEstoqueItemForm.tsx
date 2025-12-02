@@ -15,8 +15,13 @@ import { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 
 const schema = z.object({
-  itemId: z.number({ required_error: "Selecione o item" }),
-  quantidade: z.number().min(1, "Quantidade deve ser maior que zero"),
+  itemId: z.coerce.number({ required_error: "Selecione o item" }),
+  quantidade: z
+    .coerce.number({ required_error: "Informe a quantidade" })
+    .min(1, "Quantidade deve ser maior que zero"),
+  minimo: z
+    .coerce.number({ required_error: "Informe o mínimo" })
+    .min(0, "Mínimo não pode ser negativo"),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -48,7 +53,8 @@ export default function CreateEstoqueItemForm({ estoqueId }: Props) {
   useEffect(() => {
     async function fetchEquipamentos() {
       try {
-        const res = await api.get("/equipment/visualizar");
+        const res = await api.get("/equipment/visualizarItem");
+        console.log("Dados da api", res.data);
         setEquipamentos(res.data);
       } catch (error) {
         console.error("Erro ao buscar equipamentos", error);
@@ -79,7 +85,11 @@ export default function CreateEstoqueItemForm({ estoqueId }: Props) {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await api.post(`/stockmovi/cadastro/${estoqueId}/adicionar-equipamento`, data);
+      console.log("Payload enviado:", data);
+      await api.post(
+        `/stockmovi/cadastro/${estoqueId}/adicionar-equipamento`,
+        data
+      );
       reset();
       Swal.fire({
         icon: "success",
@@ -112,8 +122,9 @@ export default function CreateEstoqueItemForm({ estoqueId }: Props) {
       />
 
       <main
-        className={`min-h-screen transition-all duration-300 p-8 ${sidebarCollapsed ? "ml-16" : "ml-64"
-          } bg-background text-foreground`}
+        className={`min-h-screen transition-all duration-300 p-8 ${
+          sidebarCollapsed ? "ml-16" : "ml-64"
+        } bg-background text-foreground`}
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -132,7 +143,7 @@ export default function CreateEstoqueItemForm({ estoqueId }: Props) {
                   <Label htmlFor="itemId">Equipamento</Label>
                   <select
                     id="itemId"
-                    {...register("itemId", { valueAsNumber: true })}
+                    {...register("itemId")}
                     className="w-full border border-input rounded-md px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
                   >
                     <option value="">Selecione um equipamento</option>
@@ -143,25 +154,46 @@ export default function CreateEstoqueItemForm({ estoqueId }: Props) {
                     ))}
                   </select>
                   {errors.itemId && (
-                    <p className="text-red-500 text-sm mt-1">{errors.itemId.message}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.itemId.message}
+                    </p>
                   )}
                 </div>
 
                 {quantidadeDisponivel !== null && (
                   <div className="text-sm text-gray-600 dark:text-gray-300">
-                    Quantidade disponível: <strong>{quantidadeDisponivel}</strong>
+                    Quantidade disponível:{" "}
+                    <strong>{quantidadeDisponivel}</strong>
                   </div>
                 )}
 
                 <div>
                   <Label htmlFor="quantidade">Quantidade</Label>
                   <Input
+                    id="quantidade"
                     type="number"
                     placeholder="Digite a quantidade"
-                    {...register("quantidade", { valueAsNumber: true })}
+                    {...register("quantidade")}
                   />
                   {errors.quantidade && (
-                    <p className="text-red-500 text-sm mt-1">{errors.quantidade.message}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.quantidade.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="minimo">Estoque mínimo</Label>
+                  <Input
+                    id="minimo"
+                    type="number"
+                    placeholder="Digite o mínimo"
+                    {...register("minimo")}
+                  />
+                  {errors.minimo && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.minimo.message}
+                    </p>
                   )}
                 </div>
 

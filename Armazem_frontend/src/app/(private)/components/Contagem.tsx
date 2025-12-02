@@ -78,7 +78,6 @@ export function Contagens({ userId, canGenerate }: { userId: number; canGenerate
     onError: (e: any) => alert(e?.message ?? 'Falha ao cancelar'),
   });
 
-  // 👇 NOVO: mutation pra gerar contagem cíclica
   const gerarMut = useMutation({
     mutationFn: () => apiGerarContagemCiclica(),
     onSuccess: (out) => {
