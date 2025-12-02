@@ -430,6 +430,7 @@ export async function patchEstoqueItemAutoConfig(
     Body: Partial<{
       autoAtivo: boolean;
       maximo: number | null;
+      minimo: number | null;
       multiplo: number | null;
       origemPreferidaId: number | null | 0;
       leadTimeDias: number | null;
@@ -444,21 +445,18 @@ export async function patchEstoqueItemAutoConfig(
       return reply.code(400).send({ error: 'Parâmetros inválidos.' });
     }
 
-    // Body pode vir vazio => só executar auto-reposição
     const hasBody = req.body && Object.keys(req.body).length > 0;
 
-    // normalizações
     const autoAtivo = req.body?.autoAtivo;
     const maximo = req.body?.maximo;
+    const minimo = req.body?.minimo;
     const multiplo = req.body?.multiplo;
-    // 0 (ou <=0) não é preferida
     const origemPreferidaId =
       req.body?.origemPreferidaId && req.body?.origemPreferidaId > 0
         ? req.body.origemPreferidaId
         : null;
     const leadTimeDias = req.body?.leadTimeDias;
 
-    // validações (só quando vier no body)
     if (hasBody) {
       if (multiplo != null && multiplo < 1) {
         return reply.status(400).send({ error: 'multiplo deve ser >= 1' });
@@ -488,6 +486,7 @@ export async function patchEstoqueItemAutoConfig(
         update: {
           ...(autoAtivo !== undefined ? { autoAtivo } : {}),
           ...(maximo !== undefined ? { maximo } : {}),
+          ...(minimo !== undefined ? { minimo } : {}),
           ...(multiplo !== undefined ? { multiplo } : {}),
           ...(req.body?.origemPreferidaId !== undefined ? { origemPreferidaId } : {}),
           ...(leadTimeDias !== undefined ? { leadTimeDias } : {}),

@@ -36,7 +36,7 @@ export async function getItemConfig(estoqueId: number, itemId: number) {
 
 export async function patchAutoRepo(
   estoqueId: number, itemId: number,
-  body: Partial<Pick<EstoqueItemConfig,'autoAtivo'|'maximo'|'multiplo'|'origemPreferidaId'>>
+  body: Partial<Pick<EstoqueItemConfig,'autoAtivo'|'maximo'|'multiplo'|'origemPreferidaId' | 'minimo'>>
 ) {
   const { data } = await api.patch<EstoqueItemConfig>(`/estoques/${estoqueId}/itens/${itemId}/auto`, body);
   return data;

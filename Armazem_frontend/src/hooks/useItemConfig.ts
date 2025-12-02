@@ -40,6 +40,7 @@ export function useItemConfig(estoqueId: number, itemId: number) {
     try {
       const res = await patchAutoRepo(estoqueId, itemId, {
         autoAtivo: partial.autoAtivo ?? cfg.autoAtivo,
+        minimo: partial.minimo ?? cfg.minimo ?? null,
         maximo: partial.maximo ?? cfg.maximo ?? null,
         multiplo: partial.multiplo ?? cfg.multiplo ?? null,
         origemPreferidaId: partial.origemPreferidaId ?? cfg.origemPreferidaId ?? null,
