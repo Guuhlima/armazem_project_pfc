@@ -111,8 +111,8 @@ const TableUsuario = () => {
   }, [isSuper, isAdmin, isRestrictedUser, user]);
 
   const displayEmail = useCallback(
-    (email: string) => (isSuper ? email : maskEmail(email, 3, true)),
-    [isSuper]
+    (email: string) => maskEmail(email, 3, true),
+    []
   );
 
   const swal = Swal.mixin({
