@@ -21,6 +21,20 @@ export async function executarAgendamento(agendamentoId: number) {
   });
   if (!item) return { ok: false, reason: "ITEM_NOT_FOUND" };
 
+  const usuario =
+    ag.usuarioId
+      ? await prisma.usuario.findUnique({
+          where: { id: ag.usuarioId },
+          select: { id: true, nome: true, email: true },
+        })
+      : null;
+
+  const usuarioSnapshot = {
+    id: usuario?.id ?? SYSTEM_USER_ID,
+    nome: usuario?.nome ?? "system:auto",
+    email: usuario?.email ?? null,
+  };
+
   try {
     if (item.rastreioTipo === RastreioTipo.SERIAL) {
       await prisma.transferenciaAgendada.update({
@@ -51,6 +65,7 @@ export async function executarAgendamento(agendamentoId: number) {
           destinoId: ag.estoqueDestinoId,
           loteId: l.lote_id,
           referencia: { tabela: "transferenciaAgendada", id: ag.id },
+          usuario: usuarioSnapshot,
         });
 
         restante -= usar;
@@ -100,6 +115,7 @@ export async function executarAgendamento(agendamentoId: number) {
       origemId: ag.estoqueOrigemId!,
       destinoId: ag.estoqueDestinoId,
       referencia: { tabela: "transferenciaAgendada", id: ag.id },
+      usuario: usuarioSnapshot,
     });
 
     const created = await prisma.transferencia.create({

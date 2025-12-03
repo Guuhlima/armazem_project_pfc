@@ -297,10 +297,12 @@ export const deletarUsuarios = async (
       await tx.usuarioRole.deleteMany({ where: { usuarioId: id } });
       await tx.usuarioEstoque.deleteMany({ where: { usuarioId: id } });
       await tx.ciente_cookies.deleteMany({ where: { userId: id } }); 
+      await tx.transferencia.deleteMany({ where: { usuarioId: id}});
+      await tx.transferenciaAgendada.deleteMany({ where: { usuarioId: id}});
       await tx.usuario.delete({ where: { id } }); 
     });
 
-    return reply.code(200).send('Usuário anonimizado com sucesso.');
+    return reply.code(200).send('Usuário deletado com sucesso.');
   } catch (err: any) {
     if (err?.code === 'P2003') {
       return reply.status(409).send({

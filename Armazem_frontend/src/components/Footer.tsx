@@ -147,8 +147,8 @@ export default function Footer() {
                                 risco à segurança da Plataforma.
                             </li>
                             <li>
-                                Você pode solicitar o encerramento da conta pelos canais de
-                                suporte. Alguns dados poderão ser mantidos para cumprimento de
+                                Você pode encerrar sua conta acessando a pagina usuario em gestão.
+                                Alguns dados poderão ser mantidos para cumprimento de
                                 obrigações legais.
                             </li>
                         </ul>
@@ -158,8 +158,7 @@ export default function Footer() {
                             Estes Termos podem ser atualizados periodicamente para refletir
                             melhorias, adequações legais ou mudanças de serviço. Quando
                             alterações relevantes forem realizadas, poderemos notificá-lo
-                            pelos canais de contato cadastrados ou por aviso na própria
-                            Plataforma.
+                            pelos canais de contato cadastrados.
                         </p>
 
                         <h3 className="font-semibold mt-2">9. Contato</h3>
@@ -213,14 +212,36 @@ export default function Footer() {
                                 acesso e comunicações essenciais.
                             </li>
                             <li>
-                                <strong>Número de telefone</strong>: envio de{" "}
-                                <strong>notificações via Telegram</strong> (caso você opte por
-                                vincular), para <strong>acompanhamento e evolução</strong> de
-                                equipamentos e do <strong>status do usuário no estoque</strong>.
+                                <strong>Número de telefone</strong>: envio de notificações via Telegram.
                             </li>
                             <li>
-                                <strong>Cookies</strong>: manter sua sessão, lembrar
-                                preferências e proteger contra uso indevido.
+                                <strong>Cookies</strong>: manter sua sessão e proteger a conta.
+                            </li>
+                        </ul>
+
+                        <h3 className="font-semibold mt-2">
+                            2.1. Registros de atividades (logs de auditoria)
+                        </h3>
+                        <p>
+                            Para garantir rastreabilidade, segurança e integridade das operações de
+                            estoque, podemos registrar determinadas ações realizadas na plataforma,
+                            como entradas, saídas, transferências, ajustes de inventário e alterações
+                            de configurações.
+                        </p>
+                        <ul className="list-disc ml-5 space-y-1 mt-1">
+                            <li>
+                                Esses registros podem incluir: identificação do usuário (id interno),
+                                nome, e-mail, data e hora da ação e tipo de operação realizada.
+                            </li>
+                            <li>
+                                Esses logs são usados para fins de segurança, prevenção a fraudes,
+                                auditoria interna e atendimento a solicitações de clientes e obrigações
+                                legais.
+                            </li>
+                            <li>
+                                A base legal para esse tratamento é o{" "}
+                                <strong>interesse legítimo</strong> do controlador, bem como{" "}
+                                <strong>cumprimento de obrigações legais</strong>, quando aplicável.
                             </li>
                         </ul>
 

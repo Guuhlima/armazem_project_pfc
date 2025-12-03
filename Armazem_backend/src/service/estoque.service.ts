@@ -1,6 +1,12 @@
 import { PrismaClient, RastreioTipo } from '@prisma/client';
 const prisma = new PrismaClient();
 
+type UsuarioSnapshot = {
+  id: number;
+  nome?: string | null;
+  email?: string | null;
+};
+
 /** Helpers *******************************************************************/
 
 async function getItemOrThrow(itemId: number) {
@@ -72,43 +78,6 @@ export async function sugerirFEFO(itemId: number, estoqueId: number, take = 5) {
   return lotes.slice(0, take);
 }
 
-async function criarMov({
-  itemId,
-  loteId,
-  serialId,
-  estoqueOrigemId,
-  estoqueDestinoId,
-  quantidade,
-  tipoEvento,
-  referenciaTabela,
-  referenciaId,
-}: {
-  itemId: number;
-  loteId?: number | null;
-  serialId?: number | null;
-  estoqueOrigemId?: number | null;
-  estoqueDestinoId?: number | null;
-  quantidade: number;
-  tipoEvento: string;
-  referenciaTabela?: string;
-  referenciaId?: number | null;
-}) {
-  if (quantidade <= 0) throw new Error('quantidade deve ser > 0');
-  return prisma.movEstoque.create({
-    data: {
-      itemId,
-      loteId: loteId ?? null,
-      serialId: serialId ?? null,
-      estoqueOrigemId: estoqueOrigemId ?? null,
-      estoqueDestinoId: estoqueDestinoId ?? null,
-      quantidade,
-      tipoEvento,
-      referenciaTabela: referenciaTabela ?? null,
-      referenciaId: referenciaId ?? null,
-    },
-  });
-}
-
 export async function receber({
   estoqueId,
   itemId,
@@ -117,6 +86,7 @@ export async function receber({
   validade,
   serialNumero,
   referencia,
+  usuario,
 }: {
   estoqueId: number;
   itemId: number;
@@ -125,6 +95,7 @@ export async function receber({
   validade?: Date | string | null;
   serialNumero?: string;
   referencia?: { tabela?: string; id?: number };
+  usuario?: UsuarioSnapshot;
 }) {
   const item = await getItemOrThrow(itemId);
 
@@ -159,6 +130,10 @@ export async function receber({
         tipoEvento: 'IN',
         referenciaTabela: referencia?.tabela ?? null,
         referenciaId: referencia?.id ?? null,
+
+        usuarioId: usuario?.id ?? null,
+        usuarioNome: usuario?.nome ?? null,
+        usuarioEmail: usuario?.email ?? null,
       },
     });
 
@@ -185,6 +160,7 @@ export async function transferir({
   loteId,
   serialId,
   referencia,
+  usuario,
 }: {
   itemId: number;
   quantidade: number;
@@ -193,6 +169,7 @@ export async function transferir({
   loteId?: number | null;
   serialId?: number | null;
   referencia?: { tabela?: string; id?: number };
+  usuario?: UsuarioSnapshot;
 }) {
   if (quantidade <= 0) {
     throw new Error('Quantidade inválida para transferência');
@@ -289,6 +266,10 @@ export async function transferir({
         tipoEvento: 'TRANSF_OUT',
         referenciaTabela: referencia?.tabela ?? null,
         referenciaId: referencia?.id ?? null,
+
+        usuarioId: usuario?.id ?? null,
+        usuarioNome: usuario?.nome ?? null,
+        usuarioEmail: usuario?.email ?? null,
       },
     });
 
@@ -302,6 +283,10 @@ export async function transferir({
         tipoEvento: 'TRANSF_IN',
         referenciaTabela: referencia?.tabela ?? null,
         referenciaId: referencia?.id ?? null,
+
+        usuarioId: usuario?.id ?? null,
+        usuarioNome: usuario?.nome ?? null,
+        usuarioEmail: usuario?.email ?? null,
       },
     });
 
@@ -315,13 +300,15 @@ export async function pickingFEFO({
   itemId,
   quantidadeSolicitada,
   referencia,
-  permitirVencidos
+  permitirVencidos,
+  usuario,
 }: {
   estoqueId: number;
   itemId: number;
   quantidadeSolicitada: number;
   referencia?: { tabela?: string; id?: number };
   permitirVencidos?: boolean
+  usuario?: UsuarioSnapshot;
 }) {
   const item = await getItemOrThrow(itemId);
 
@@ -365,6 +352,10 @@ export async function pickingFEFO({
           tipoEvento: 'OUT',
           referenciaTabela: referencia?.tabela ?? null,
           referenciaId: referencia?.id ?? null,
+
+          usuarioId: usuario?.id ?? null,
+          usuarioNome: usuario?.nome ?? null,
+          usuarioEmail: usuario?.email ?? null,
         },
       });
 
@@ -398,11 +389,13 @@ export async function saidaPorSerial({
   itemId,
   serialNumero,
   referencia,
+  usuario,
 }: {
   estoqueId: number;
   itemId: number;
   serialNumero: string;
   referencia?: { tabela?: string; id?: number };
+  usuario?: UsuarioSnapshot;
 }) {
   const item = await getItemOrThrow(itemId);
   if (item.rastreioTipo !== 'SERIAL') throw new Error('Item não é SERIAL');
@@ -426,12 +419,9 @@ export async function saidaPorSerial({
   const saldo = Number(saldoSerial[0]?.saldo ?? 0);
   if (saldo <= 0) throw new Error('Serial não está disponível neste estoque');
 
-  // Validade do lote do serial, se houver
   await assertValidadeOk(serial.loteId ?? undefined);
 
-  // 🔥 Tudo em transação: movimento + snapshot + total do item
   await prisma.$transaction(async (tx) => {
-    // 1) Movimento de saída
     await tx.movEstoque.create({
       data: {
         itemId,
@@ -442,6 +432,10 @@ export async function saidaPorSerial({
         tipoEvento: 'OUT',
         referenciaTabela: referencia?.tabela ?? null,
         referenciaId: referencia?.id ?? null,
+
+        usuarioId: usuario?.id ?? null,
+        usuarioNome: usuario?.nome ?? null,
+        usuarioEmail: usuario?.email ?? null,
       },
     });
 

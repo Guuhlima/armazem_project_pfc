@@ -13,7 +13,7 @@ export async function receberEquipamento(
   reply: FastifyReply
 ) {
   try {
-    let {
+    const {
       estoqueId,
       itemId,
       quantidade,
@@ -23,6 +23,12 @@ export async function receberEquipamento(
       referencia,
     } = req.body;
 
+    const rawUser = req.user as any;
+
+    const usuarioId = Number(rawUser?.sub);
+    const usuarioNome = rawUser?.nome ?? `user#${usuarioId}`;
+    const usuarioEmail = rawUser?.email ?? null;
+
     if (quantidade <= 0) {
       return reply.status(400).send({ error: 'Quantidade deve ser maior que zero' });
     }
@@ -31,15 +37,15 @@ export async function receberEquipamento(
       where: { id: itemId },
       select: { rastreioTipo: true, nome: true },
     });
-    if (!item) return reply.status(404).send({ error: `Item ${itemId} não encontrado` });
+    if (!item) {
+      return reply.status(404).send({ error: `Item ${itemId} não encontrado` });
+    }
     if (item.rastreioTipo === 'SERIAL' && quantidade !== 1) {
-      return reply.status(400).send({ error: 'Itens SERIAL devem ser recebidos com quantidade = 1' });
+      return reply
+        .status(400)
+        .send({ error: 'Itens SERIAL devem ser recebidos com quantidade = 1' });
     }
-
-    if (typeof validade === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(validade)) {
-      // validade = new Date(`${validade}T00:00:00`);
-    }
-
+    
     await inv.receber({
       estoqueId,
       itemId,
@@ -50,6 +56,11 @@ export async function receberEquipamento(
       referencia: {
         tabela: referencia?.tabela ?? 'recebimento',
         id: referencia?.id,
+      },
+      usuario: {
+        id: usuarioId,
+        nome: usuarioNome,
+        email: usuarioEmail,
       },
     });
 
@@ -75,8 +86,16 @@ export async function receberEquipamento(
 
     req.log.info({
       action: 'recebimento_ok',
-      estoqueId, itemId, quantidade, loteCodigo, serialNumero,
-      loteId: lote?.id, serialId: serial?.id
+      estoqueId,
+      itemId,
+      quantidade,
+      loteCodigo,
+      serialNumero,
+      loteId: lote?.id,
+      serialId: serial?.id,
+      usuarioId,
+      usuarioNome,
+      usuarioEmail,
     });
 
     return reply.send({
@@ -86,8 +105,12 @@ export async function receberEquipamento(
       itemId,
       quantidade,
       itemRastreio: item.rastreioTipo,
-      lote: lote ? { id: lote.id, codigo: lote.codigo, validade: lote.validade } : null,
-      serial: serial ? { id: serial.id, numero: serial.numero, loteId: serial.loteId } : null,
+      lote: lote
+        ? { id: lote.id, codigo: lote.codigo, validade: lote.validade }
+        : null,
+      serial: serial
+        ? { id: serial.id, numero: serial.numero, loteId: serial.loteId }
+        : null,
       saldoPorLote: saldoLotes,
     });
   } catch (error: any) {

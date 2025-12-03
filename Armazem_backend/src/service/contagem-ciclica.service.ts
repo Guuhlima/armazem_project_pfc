@@ -187,6 +187,11 @@ export async function lancarContagem(
       return { ok: false, reason: "INVALID_STATUS_OR_NOT_FOUND" };
     }
 
+    const usuario = await tx.usuario.findUnique({
+      where: { id: userId },
+      select: { id: true, nome: true, email: true },
+    });
+
     if (tarefa.status === "RECOUNT_REQUIRED") {
       const first = await tx.contagemCiclicaLancamento.findFirst({
         where: { tarefaId, tentativa: 1 },
@@ -244,6 +249,10 @@ export async function lancarContagem(
         tipoEvento: "AJUSTE_CC",
         referenciaTabela: "contagem_ciclica",
         referenciaId: tarefaId,
+
+        usuarioId: usuario?.id ?? null,
+        usuarioNome: usuario?.nome ?? null,
+        usuarioEmail: usuario?.email ?? null,
       },
     });
 

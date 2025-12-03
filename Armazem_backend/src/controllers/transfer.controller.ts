@@ -24,11 +24,17 @@ export async function realizarTransferencia(
       referencia
     } = req.body;
 
-    const usuarioId = Number((req.user as any)?.id);
-    const usuarioNome = (req.user as any)?.nome ?? `user#${usuarioId}`;
+    const rawUser = req.user as any;
+
+    const usuarioId = Number(rawUser?.sub);
+    const usuarioNome = rawUser?.nome ?? `user#${usuarioId}`;
+    const usuarioEmail = rawUser?.email ?? null;
+
     if (!usuarioId) return reply.status(401).send({ error: 'Não autenticado' });
     if (estoqueOrigemId === estoqueDestinoId) {
-      return reply.status(400).send({ error: 'Estoques de origem e destino devem ser diferentes' });
+      return reply
+        .status(400)
+        .send({ error: 'Estoques de origem e destino devem ser diferentes' });
     }
     if (quantidade <= 0) {
       return reply.status(400).send({ error: 'Quantidade deve ser maior que zero' });
@@ -44,51 +50,66 @@ export async function realizarTransferencia(
     if (loteCodigo) {
       const lote = await prisma.lote.findFirst({ where: { itemId, codigo: loteCodigo } });
       if (!lote)
-        return reply.status(400).send({ error: `Lote ${loteCodigo} não encontrado para o item ${itemId}` });
+        return reply
+          .status(400)
+          .send({ error: `Lote ${loteCodigo} não encontrado para o item ${itemId}` });
       loteId = lote.id;
     }
 
     if (serialNumero) {
       const serial = await prisma.serial.findUnique({ where: { numero: serialNumero } });
       if (!serial || serial.itemId !== itemId)
-        return reply.status(400).send({ error: `Serial ${serialNumero} não encontrado para o item ${itemId}` });
+        return reply
+          .status(400)
+          .send({ error: `Serial ${serialNumero} não encontrado para o item ${itemId}` });
       serialId = serial.id;
     }
 
-    await prisma.$transaction(async (tx) => {
-      const item = await tx.equipamento.findUnique({
-        where: { id: itemId },
-        select: { nome: true },
-      });
-      itemNome = item?.nome ?? `Item#${itemId}`;
+    await prisma.$transaction(
+      async (tx) => {
+        const item = await tx.equipamento.findUnique({
+          where: { id: itemId },
+          select: { nome: true },
+        });
+        itemNome = item?.nome ?? `Item#${itemId}`;
 
-      await inv.transferir({
-        itemId,
-        quantidade,
-        origemId: estoqueOrigemId,
-        destinoId: estoqueDestinoId,
-        loteId: loteId ?? undefined,
-        serialId: serialId ?? undefined,
-        referencia: {
-          tabela: referencia?.tabela ?? 'transferencia',
-          id: referencia?.id ?? undefined,
-        },
-      });
+        console.log('[DEBUG req.user]', req.user);
+        console.log('[DEBUG usuarioNome montado]', usuarioNome);
 
-      const created = await tx.transferencia.create({
-        data: {
+        await inv.transferir({
           itemId,
-          estoqueOrigemId,
-          estoqueDestinoId,
           quantidade,
-          usuarioId,
-        },
-        select: { id: true, dataTransferencia: true },
-      });
+          origemId: estoqueOrigemId,
+          destinoId: estoqueDestinoId,
+          loteId: loteId ?? undefined,
+          serialId: serialId ?? undefined,
+          referencia: {
+            tabela: referencia?.tabela ?? 'transferencia',
+            id: referencia?.id ?? undefined,
+          },
+          usuario: {
+            id: usuarioId,
+            nome: usuarioNome,
+            email: usuarioEmail,
+          },
+        });
+        
+        const created = await tx.transferencia.create({
+          data: {
+            itemId,
+            estoqueOrigemId,
+            estoqueDestinoId,
+            quantidade,
+            usuarioId,
+          },
+          select: { id: true, dataTransferencia: true },
+        });
 
-      createdTransferId = created.id;
-      quando = created.dataTransferencia ?? new Date();
-    }, { isolationLevel: 'Serializable' });
+        createdTransferId = created.id;
+        quando = created.dataTransferencia ?? new Date();
+      },
+      { isolationLevel: 'Serializable' }
+    );
 
     try {
       await TelegramService.sendTransferNotification({
@@ -169,16 +190,39 @@ export async function deletarTransferencia(
 ) {
   try {
     const id = parseInt(req.params.id);
-
-    await prisma.transferencia.delete({ where: { id } });
-
-    reply.send('Transferência deletada com sucesso');
-  } catch (error: any) {
-    if (error.code === 'P2025') {
-      reply.status(404).send({ error: 'Transferência não encontrada' });
-    } else {
-      reply.status(500).send({ error: 'Erro ao deletar transferência' });
-      console.error(error);
+    if (Number.isNaN(id)) {
+      return reply.status(400).send({ error: 'ID inválido' });
     }
+
+    const usuarioId = Number((req.user as any)?.id);
+    const usuarioNome = (req.user as any)?.nome ?? `user#${usuarioId}`;
+    const usuarioEmail =
+      (req.user as any)?.email;
+
+    if (!usuarioId) {
+      return reply.status(401).send({ error: 'Não autenticado' });
+    }
+
+    const transferencia = await prisma.transferencia.findUnique({
+      where: { id },
+    });
+
+    if (!transferencia) {
+      return reply.status(404).send({ error: 'Transferência não encontrada' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.transferencia.delete({ where: { id } });
+    });
+
+    return reply.send('Transferência deletada com sucesso');
+  } catch (error: any) {
+    console.error(error);
+
+    if (error.code === 'P2025') {
+      return reply.status(404).send({ error: 'Transferência não encontrada' });
+    }
+
+    return reply.status(500).send({ error: 'Erro ao deletar transferência' });
   }
 }

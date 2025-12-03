@@ -357,7 +357,32 @@ export async function postPickingFEFO(
 ) {
   try {
     const { estoqueId, itemId, quantidadeSolicitada, referencia, permitirVencidos } = req.body;
-    const r = await pickingFEFO({ estoqueId, itemId, quantidadeSolicitada, referencia, permitirVencidos });
+
+    const rawUser = req.user as any | undefined;
+    const rawId = rawUser?.sub ?? rawUser?.id;
+    const usuarioId =
+      rawId !== undefined && rawId !== null && rawId !== ''
+        ? Number(rawId)
+        : null;
+
+    const usuarioSnapshot =
+      usuarioId !== null && !Number.isNaN(usuarioId)
+        ? {
+            id: usuarioId,
+            nome: rawUser?.nome ?? `user#${usuarioId}`,
+            email: rawUser?.email ?? null,
+          }
+        : undefined;
+
+    const r = await pickingFEFO({
+      estoqueId,
+      itemId,
+      quantidadeSolicitada,
+      referencia,
+      permitirVencidos,
+      usuario: usuarioSnapshot,
+    });
+
     return reply.send(r);
   } catch (e: any) {
     return reply.code(400).send({ error: e?.message ?? 'Erro no picking FEFO' });
@@ -373,7 +398,31 @@ export async function postSaidaSerial(
 ) {
   try {
     const { estoqueId, itemId, serialNumero, referencia } = req.body;
-    const r = await saidaPorSerial({ estoqueId, itemId, serialNumero, referencia });
+
+    const rawUser = req.user as any | undefined;
+    const rawId = rawUser?.sub ?? rawUser?.id;
+    const usuarioId =
+      rawId !== undefined && rawId !== null && rawId !== ''
+        ? Number(rawId)
+        : null;
+
+    const usuarioSnapshot =
+      usuarioId !== null && !Number.isNaN(usuarioId)
+        ? {
+            id: usuarioId,
+            nome: rawUser?.nome ?? `user#${usuarioId}`,
+            email: rawUser?.email ?? null,
+          }
+        : undefined;
+
+    const r = await saidaPorSerial({
+      estoqueId,
+      itemId,
+      serialNumero,
+      referencia,
+      usuario: usuarioSnapshot,
+    });
+
     return reply.send(r);
   } catch (e: any) {
     return reply.code(400).send({ error: e?.message ?? 'Erro na saída por serial' });
@@ -486,8 +535,7 @@ export async function patchEstoqueItemAutoConfig(
         update: {
           ...(autoAtivo !== undefined ? { autoAtivo } : {}),
           ...(maximo !== undefined ? { maximo } : {}),
-          ...(minimo !== undefined ? { minimo } : {}),
-          ...(multiplo !== undefined ? { multiplo } : {}),
+          ...(minimo !== undefined ? { minimo: minimo ?? 0 } : {}),
           ...(req.body?.origemPreferidaId !== undefined ? { origemPreferidaId } : {}),
           ...(leadTimeDias !== undefined ? { leadTimeDias } : {}),
         },
