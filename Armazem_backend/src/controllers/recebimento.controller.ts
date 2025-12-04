@@ -7,6 +7,24 @@ import { prisma } from '../lib/prisma';
 
 type Body = Static<typeof RecebimentoBodySchema>;
 
+function normalizeValidade(input: unknown): Date | null {
+  if (!input) return null;
+
+  if (input instanceof Date && !isNaN(input.getTime())) return input;
+
+  if (typeof input === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+      const d = new Date(`${input}T12:00:00-03:00`);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
 // Receber novos equipamentos ao armazem
 export async function receberEquipamento(
   req: FastifyRequest<{ Body: Body }>,
@@ -45,13 +63,16 @@ export async function receberEquipamento(
         .status(400)
         .send({ error: 'Itens SERIAL devem ser recebidos com quantidade = 1' });
     }
-    
+
+    // ✅ Normaliza a validade para evitar D-1
+    const validadeSafe = normalizeValidade(validade);
+
     await inv.receber({
       estoqueId,
       itemId,
       quantidade,
       loteCodigo,
-      validade,
+      validade: validadeSafe,
       serialNumero,
       referencia: {
         tabela: referencia?.tabela ?? 'recebimento',

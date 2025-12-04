@@ -31,10 +31,17 @@ export default function SaidaForm() {
   const MySwal = withReactContent(Swal);
   const { hasPermission } = useAuth();
 
-  const hojeYmd = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+  const hojeYmd = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   const isVencido = (validade?: string | null) => {
     if (!validade) return false;
-    const d = new Date(validade); d.setHours(0, 0, 0, 0);
+    const d = parseValidadeToDate(validade);
+    if (!d) return false;
+    d.setHours(0, 0, 0, 0);
     return d < hojeYmd();
   };
 
@@ -74,6 +81,22 @@ export default function SaidaForm() {
       }
     })();
   }, [estoqueId]);
+
+  function parseValidadeToDate(raw?: string | null): Date | null {
+    if (!raw) return null;
+
+    const s = String(raw).trim();
+
+    const datePart = s.slice(0, 10);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+      const [y, m, d] = datePart.split('-').map(Number);
+      return new Date(y, m - 1, d, 0, 0, 0, 0);
+    }
+
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
 
   async function carregarSugestoes() {
     if (!itemId || !estoqueId) return setSugestoes([]);
@@ -315,7 +338,8 @@ export default function SaidaForm() {
                 <div className="font-semibold">Status</div>
 
                 {preview.map((l) => {
-                  const venc = l.validade ? new Date(l.validade).toLocaleDateString('pt-BR') : '—';
+                  const vencDate = parseValidadeToDate(l.validade);
+                  const venc = vencDate ? vencDate.toLocaleDateString('pt-BR') : '—';
                   const vencido = isVencido(l.validade);
                   const statusBadge = vencido ? (
                     <span className="inline-flex items-center rounded px-2 py-[1px] text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300">
@@ -341,7 +365,8 @@ export default function SaidaForm() {
                 {!permitirVencidos && sugestoes
                   .filter(l => isVencido(l.validade))
                   .map((l) => {
-                    const venc = l.validade ? new Date(l.validade).toLocaleDateString('pt-BR') : '—';
+                  const vencDate = parseValidadeToDate(l.validade);
+                  const venc = vencDate ? vencDate.toLocaleDateString('pt-BR') : '—';
                     return (
                       <Fragment key={`venc-${l.lote_id}`}>
                         <div className="opacity-60">{l.codigo} (#{l.lote_id})</div>
