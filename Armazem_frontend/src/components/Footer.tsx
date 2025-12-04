@@ -147,7 +147,7 @@ export default function Footer() {
                                 risco à segurança da Plataforma.
                             </li>
                             <li>
-                                Você pode encerrar sua conta acessando a pagina usuario em gestão.
+                                Você pode encerrar sua conta acessando a página de gestão de usuário.
                                 Alguns dados poderão ser mantidos para cumprimento de
                                 obrigações legais.
                             </li>
@@ -270,11 +270,26 @@ export default function Footer() {
                             <li>Controles de acesso e registro de atividades relevantes.</li>
                         </ul>
 
-                        <h3 className="font-semibold mt-2">5. Retenção</h3>
+                        <h3 className="font-semibold mt-2">5. Retenção e exclusão</h3>
                         <p>
-                            Mantemos os dados pelo tempo necessário às finalidades
-                            legais/operacionais. Você pode solicitar exclusão quando
-                            permitido.
+                            Mantemos os dados pessoais pelo tempo necessário para operação da conta,
+                            cumprimento de obrigações legais e suporte.
+                        </p>
+                        <ul className="list-disc ml-5 space-y-1">
+                            <li>
+                                <strong>Dados de conta (nome, e-mail):</strong> mantidos enquanto a
+                                conta estiver ativa ou conforme exigido por lei.
+                            </li>
+                            <li>
+                                <strong>Logs de atividades e auditoria de estoque:</strong> mantidos
+                                por até <strong>5 anos</strong>, de acordo com prazos legais de
+                                prescrição civil e fiscal aplicáveis às operações, garantindo
+                                rastreabilidade, segurança e prevenção a fraudes.
+                            </li>
+                        </ul>
+                        <p>
+                            Após o fim da finalidade ou do prazo legal, os dados poderão ser
+                            anonimizados ou excluídos de forma segura.
                         </p>
 
                         <h3 className="font-semibold mt-2">6. Compartilhamento</h3>

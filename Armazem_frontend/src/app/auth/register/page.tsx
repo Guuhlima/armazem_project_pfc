@@ -39,46 +39,76 @@ export default function Register() {
       },
       html: `
         <div style="text-align:left; max-height:60vh; overflow:auto; padding-right:6px">
-          <p style="margin:0 0 12px">Valorizamos sua privacidade. Abaixo explicamos de forma clara como tratamos seus dados pessoais.</p>
+          <p style="margin:0 0 12px">
+            Valorizamos sua privacidade. Abaixo um resumo de como tratamos seus dados na
+            <strong>Plataforma Armazém Integrado G3</strong>.
+          </p>
+
           <h3 style="margin:16px 0 8px">1. Quais dados coletamos</h3>
           <ul style="margin-left:18px">
-            <li><strong>Nome</strong></li>
-            <li><strong>Email</strong></li>
-            <li><strong>Número de telefone</strong> (opcional, para integrações)</li>
-            <li><strong>Cookies</strong> estritamente necessários para cadastro, sessão e segurança</li>
+            <li><strong>Nome</strong> e <strong>e-mail</strong> para criação e acesso à conta.</li>
+            <li><strong>Senha</strong>, armazenada de forma irreversível (hash com bcrypt).</li>
+            <li><strong>Número de telefone</strong> (opcional), caso você queira ativar integrações como notificações via Telegram.</li>
+            <li><strong>Cookies</strong> estritamente necessários para autenticação, sessão e segurança.</li>
           </ul>
+
           <h3 style="margin:16px 0 8px">2. Como usamos seus dados</h3>
           <ul style="margin-left:18px">
-            <li><strong>Email</strong>: confirmação de conta, recuperação de acesso e comunicações essenciais.</li>
-            <li><strong>Número de telefone</strong>: envio de <strong>notificações via Telegram</strong> (opcional) para acompanhamento de equipamentos e status no estoque.</li>
-            <li><strong>Cookies</strong>: manter sessão, lembrar preferências e proteger contra uso indevido.</li>
+            <li><strong>Conta e acesso</strong>: criar seu usuário, autenticar login e manter sua sessão ativa.</li>
+            <li><strong>Comunicações essenciais</strong>: envio de e-mails de confirmação, recuperação de senha e avisos importantes.</li>
+            <li><strong>Integrações opcionais</strong>: uso do telefone para envio de notificações via Telegram (se você optar por conectar).</li>
+            <li><strong>Logs de atividades</strong>: registrar certas ações (como movimentações de estoque) vinculadas ao seu usuário para auditoria, rastreabilidade e segurança.</li>
           </ul>
+
           <h3 style="margin:16px 0 8px">3. Base legal</h3>
           <ul style="margin-left:18px">
-            <li><strong>Consentimento</strong> (cookies/comunicações opcionais)</li>
-            <li><strong>Execução de contrato</strong> (criar e gerenciar sua conta)</li>
-            <li><strong>Interesse legítimo</strong> (segurança e melhoria)</li>
+            <li><strong>Execução de contrato</strong>: criar e gerenciar sua conta e permitir o uso da plataforma.</li>
+            <li><strong>Interesse legítimo</strong>: segurança da conta, prevenção a fraudes e logs de auditoria de estoque.</li>
+            <li><strong>Consentimento</strong>: uso de cookies opcionais ou integrações como Telegram, quando aplicável.</li>
           </ul>
+
           <h3 style="margin:16px 0 8px">4. Segurança</h3>
           <ul style="margin-left:18px">
-            <li>Senha com hash <code>bcrypt</code></li>
-            <li>Controles de acesso e logs relevantes</li>
+            <li>Senha armazenada com hash <code>bcrypt</code>.</li>
+            <li>Controles de acesso e registro de atividades relevantes de estoque.</li>
           </ul>
-          <h3 style="margin:16px 0 8px">5. Retenção</h3>
-          <p>Mantemos os dados pelo tempo necessário às finalidades legais/operacionais.</p>
+
+          <h3 style="margin:16px 0 8px">5. Retenção e exclusão</h3>
+          <p>
+            Mantemos seus dados pessoais pelo tempo necessário para operação da conta,
+            cumprimento de obrigações legais e suporte. 
+          </p>
+          <ul style="margin-left:18px">
+            <li>
+              Dados de conta (nome, e-mail): enquanto sua conta estiver ativa ou conforme exigido por lei.
+            </li>
+            <li>
+              Logs de atividades e auditoria de estoque: podem ser mantidos por até <strong>2 anos</strong>
+              após o registro da operação, para fins de segurança, rastreabilidade e prevenção a fraudes.
+            </li>
+          </ul>
+          <p>
+            Quando não houver mais necessidade legal ou operacional, os dados poderão ser
+            anonimizados ou excluídos de forma segura.
+          </p>
+
           <h3 style="margin:16px 0 8px">6. Compartilhamento</h3>
           <ul style="margin-left:18px">
-            <li>Fornecedores (hospedagem, email, integrações)</li>
-            <li>Telegram (apenas se você conectar)</li>
+            <li>Fornecedores de infraestrutura (hospedagem, e-mail, monitoramento).</li>
+            <li>Telegram, apenas se você conectar o bot para notificações.</li>
           </ul>
+
           <h3 style="margin:16px 0 8px">7. Seus direitos</h3>
           <ul style="margin-left:18px">
-            <li>Acessar, corrigir, atualizar e solicitar exclusão</li>
-            <li>Revogar consentimento quando aplicável</li>
+            <li>Acessar, corrigir, atualizar e solicitar exclusão de seus dados, quando aplicável.</li>
+            <li>Revogar consentimento para usos opcionais (como integrações ou cookies não essenciais).</li>
           </ul>
+
           <h3 style="margin:16px 0 8px">8. Contato</h3>
-          <p>suporteg3@gmail.com</p>
+          <p>Em caso de dúvidas, fale com a gente: <strong>suporteg3@gmail.com</strong></p>
+
           <p style="font-size:12px; color:#9ca3af; margin-top:10px">
+            Esta é uma versão resumida. A versão completa está disponível nos links de rodapé do site.<br/>
             Última atualização: ${new Date().toLocaleDateString()}
           </p>
         </div>
@@ -88,20 +118,22 @@ export default function Register() {
 
   const pedirConsentimento = async (): Promise<boolean> => {
     const { value: aceitou } = await Swal.fire({
-      title: 'Termos & Cookies',
+      title: 'Termos de Uso & Privacidade',
       background: '#0b0b0b',
       color: '#e5e7eb',
       html: `
         <div style="text-align:left">
           <p style="margin:0 0 8px">
-            Para criar sua conta, precisamos do seu consentimento quanto ao uso de cookies e ao tratamento de dados conforme nossa
+            Para criar sua conta no <strong>Armazém Integrado G3</strong>, precisamos do seu
+            consentimento quanto ao uso de cookies necessários e ao tratamento dos seus dados
+            pessoais conforme nossa
             <button id="openPolicy" type="button" style="background:none;border:none;padding:0;margin:0;color:#60a5fa;cursor:pointer;text-decoration:underline">
-              Política de Privacidade
+              Política de Privacidade &amp; Cookies
             </button>.
           </p>
           <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
             <input type="checkbox" id="consentChk"/>
-            <span>Eu li e aceito os Termos e a Política de Privacidade.</span>
+            <span>Eu li e aceito os Termos de Uso e a Política de Privacidade da plataforma.</span>
           </label>
         </div>
       `,
