@@ -175,6 +175,24 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
     }
   }
 
+  async function handleSalvarRole() {
+    setLoadingRole(true);
+    try {
+      await api.patch(`/admin/usuarios/${userId}/role`, {
+        roleId: roleId ?? null,
+      });
+
+      toast.success("Papel global atualizado!");
+
+      setRoleInherited(false);
+    } catch (e) {
+      toast.error(getErr(e, "Falha ao salvar papel global"));
+    } finally {
+      setLoadingRole(false);
+    }
+  }
+
+
   async function handleTesteEnvio() {
     if (!hasSelection) {
       toast.error('Selecione um estoque primeiro.');
@@ -197,26 +215,6 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
       else toast.error(d?.error || 'Falha ao enviar mensagem de teste');
     } finally {
       setLoadingTest(false);
-    }
-  }
-
-  async function handleSalvarRole() {
-    if (!hasSelection) return;
-    setLoadingRole(true);
-    try {
-      // envia { roleId } — se roleId for null, limpa e passa a herdar
-      await api.put(
-        `/admin/usuarios/${userId}/estoques/${selectedEstoqueId}/role`,
-        { roleId: roleId ?? null },
-        { withCredentials: true }
-      );
-      toast.success('Permissão atualizada!');
-      // se setou explicitamente um roleId, não é herdado
-      setRoleInherited(roleId == null ? roleInherited : false);
-    } catch (e) {
-      toast.error(getErr(e, 'Falha ao salvar permissão'));
-    } finally {
-      setLoadingRole(false);
     }
   }
 
@@ -311,7 +309,13 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
               <Label htmlFor="role">Papel</Label>
               <Select
                 value={roleId != null ? String(roleId) : ''}
-                onValueChange={(v) => setRoleId(Number(v))}
+                onValueChange={(v) => {
+                  if (v === "null") {
+                    setRoleId(null); 
+                    return;
+                  }
+                  setRoleId(Number(v));
+                }}
                 disabled={!hasSelection || loadingRoles}
               >
                 <SelectTrigger id="role">
@@ -339,9 +343,9 @@ export default function ConfigUsuarioDialog({ userId, open, onOpenChange }: Prop
             <Button
               variant="secondary"
               onClick={handleSalvarRole}
-              disabled={!hasSelection || loadingRole}
+              disabled={loadingRole}
             >
-              {loadingRole ? 'Salvando...' : 'Salvar papel'}
+              {loadingRole ? "Salvando..." : "Salvar papel global"}
             </Button>
           </div>
         </div>

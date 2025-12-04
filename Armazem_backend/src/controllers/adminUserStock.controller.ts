@@ -44,44 +44,76 @@ export async function getUserStockRole(req: FastifyRequest, reply: FastifyReply)
   }
 }
 
-// Define papel por estoque via { roleId }
-export async function updateUserStockRole(req: FastifyRequest, reply: FastifyReply) {
+export async function updateUserGlobalRole(
+  req: FastifyRequest<{
+    Params: { userId: string };
+    Body: { roleId: number | null };
+  }>,
+  reply: FastifyReply
+) {
   try {
-    const { userId, estoqueId } = req.params as { userId: string; estoqueId: string };
+    const { userId } = req.params;
     const uid = Number(userId);
-    const eid = Number(estoqueId);
 
-    const { roleId } = (req.body ?? {}) as { roleId?: number | null };
+    const { roleId } = req.body;
 
-    if (roleId === null || typeof roleId === 'undefined') {
-      await prisma.usuarioEstoque.upsert({
-        where: { usuarioId_estoqueId: { usuarioId: uid, estoqueId: eid } },
-        update: { roleId: null },
-        create: { usuarioId: uid, estoqueId: eid, roleId: null },
+    await prisma.$transaction(async (tx) => {
+      await tx.usuarioRole.deleteMany({ where: { usuarioId: uid } });
+
+      if (roleId !== null) {
+        const exists = await tx.role.findUnique({
+          where: { id: roleId },
+        });
+
+        if (!exists) {
+          throw new Error("INVALID_ROLE_ID");
+        }
+
+        await tx.usuarioRole.create({
+          data: {
+            usuarioId: uid,
+            roleId,
+          },
+        });
+      }
+
+      const estoques = await tx.usuarioEstoque.findMany({
+        where: { usuarioId: uid },
       });
-      return reply.send({ ok: true, cleared: true });
+
+      for (const e of estoques) {
+        await tx.usuarioEstoque.update({
+          where: {
+            usuarioId_estoqueId: {
+              usuarioId: uid,
+              estoqueId: e.estoqueId,
+            },
+          },
+          data: {
+            roleId, // null → limpa
+          },
+        });
+      }
+    });
+
+    return reply.send({
+      ok: true,
+      roleId,
+      appliedToStocks: true,
+    });
+
+  } catch (err: any) {
+    console.error(err);
+
+    if (err.message === "INVALID_ROLE_ID") {
+      return reply.status(400).send({
+        error: "roleId inválido",
+      });
     }
 
-    const role = await prisma.role.findUnique({
-      where: { id: roleId },
-      select: { id: true, nome: true },
-    });
-    if (!role) {
-      return reply.code(400).send({ error: 'roleId inválido' });
-    }
-
-    await prisma.usuarioEstoque.upsert({
-      where: { usuarioId_estoqueId: { usuarioId: uid, estoqueId: eid } },
-      update: { roleId: role.id },
-      create: { usuarioId: uid, estoqueId: eid, roleId: role.id },
-    });
-
-    return reply.send({ ok: true, roleId: role.id, roleName: role.nome });
-  } catch (error) {
-    console.error('Erro ao atualizar papel do usuário no estoque:', error);
     return reply.status(500).send({
-      error: 'Erro interno ao atualizar papel do usuário no estoque',
-      message: (error as Error).message,
+      error: "Erro interno ao atualizar papel global",
+      message: err?.message,
     });
   }
 }
@@ -139,3 +171,4 @@ export async function listRoles(req: FastifyRequest, reply: FastifyReply) {
     });
   }
 }
+
