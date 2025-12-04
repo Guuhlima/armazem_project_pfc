@@ -8,7 +8,7 @@ let conn: Connection | null = null;
 let ch: Channel | null = null;
 let connecting: Promise<Channel> | null = null;
 
-const AMQP_URL = process.env.AMQP_URL || 'amqp://guest:guest@localhost:5672';
+const AMQP_URL = process.env.AMQP_URL!;
 const PREFETCH = Number(process.env.AMQP_PREFETCH ?? 20);
 
 const QUEUES = [

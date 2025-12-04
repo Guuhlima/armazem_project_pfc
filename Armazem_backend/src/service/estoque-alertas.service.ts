@@ -1,16 +1,12 @@
 import { prisma } from "../lib/prisma";
 import { TelegramService } from "./telegram.service";
 import type { TelegramResult } from "./telegram.service";
-import { publish } from "../queue/rabbit";
-import crypto from "crypto";
 import { autoReposicaoAutomatica } from "./agendamento.service";
 
-const FORCE_LOCAL_FALLBACK = process.env.FORCE_LOCAL_FALLBACK === "1";
 const TELEGRAM_THROTTLE_MINUTES = (() => {
   const n = Number(process.env.TELEGRAM_THROTTLE_MINUTES);
   return Number.isFinite(n) && n > 0 ? n : 60;
 })();
-const SYSTEM_USER_ID = Number(process.env.SYSTEM_USER_ID ?? 1);
 
 type AlertBase = { quantidade: number; minimo: number; telegram?: TelegramResult };
 type NoneReason = "NO_DONOR" | "NO_QTY" | "DUPLICATE" | "NOT_BELOW_MIN";
