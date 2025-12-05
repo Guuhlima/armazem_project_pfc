@@ -102,19 +102,17 @@ async function main() {
   }
 
   // Usuários de exemplo (garante que existem, evita FK P2003)
-  const adminHash = await bcrypt.hash("admin123", 10);
-  const equipHash = await bcrypt.hash("equip123", 10);
 
   const admin = await prisma.usuario.upsert({
     where: { email: "admin@local" },
     update: {},
-    create: { email: "admin@local", nome: "Admin", senha: adminHash },
+    create: { email: "admin@local", nome: "Admin" },
   });
 
   const equipUser = await prisma.usuario.upsert({
     where: { email: "equip@local" },
     update: {},
-    create: { email: "equip@local", nome: "Equip User", senha: equipHash },
+    create: { email: "equip@local", nome: "Equip User" },
   });
 
   // Vincular Roles aos usuários criados
